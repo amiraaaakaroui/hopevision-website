@@ -82,30 +82,22 @@
                 
                 <!-- Colonne Visuelle -->
                 <div class="md:w-1/2">
-                    <!-- ANCIEN: Placeholder pour un visuel produit (ex: capture d'écran de l'app) -->
-                    <!-- <img src="https://placehold.co/600x450/0f172a/06b6d4?text=Analyse+IA+Multimodale" alt="Interface de HopeVisionAI" class="rounded-lg shadow-2xl aspect-video object-cover"> -->
-
-                    <!-- NOUVEAU: Vidéo de la section Héros -->
-                    <!-- Cet élément <video> remplace l'image placeholder. -->
-                    <!-- Il est configuré pour une lecture automatique, en boucle, sans son, et s'affiche en ligne (playsinline) sur mobile. -->
-                    <!-- Le 'poster' est l'image affichée avant le chargement, basée sur la palette de l'animation. -->
-                    <!-- !! IMPORTANT: Remplacez les chemins '/chemin/vers/...' par les URL de vos fichiers vidéo .webm et .mp4 -->
-                    <video 
-                        class="rounded-lg shadow-2xl aspect-video object-cover w-full h-full" 
-                        autoplay 
-                        loop 
-                        muted 
-                        playsinline 
-                        poster="https://placehold.co/1920x1080/F0F9FF/2563EB?text=Poster+Animation+IA+(16:9)">
-                        
-                        <!-- Fournissez plusieurs formats pour une compatibilité maximale des navigateurs -->
-                        <source src="/chemin/vers/hopevisionai-hero.webm" type="video/webm">
-                        <source src="/chemin/vers/hopevisionai-hero.mp4" type="video/mp4">
-                        
-                        <!-- Message affiché si le navigateur ne supporte pas la vidéo -->
-                        Votre navigateur ne supporte pas la lecture de vidéos.
-                    </video>
+                  <video
+                    class="rounded-lg shadow-2xl aspect-video object-cover w-full h-full"
+                    autoplay
+                    loop
+                    muted
+                    playsinline
+                    poster="/assets/hero-poster.jpg"
+                  >
+                    <!-- WebM d'abord (plus léger) si tu en as une -->
+                    <source src="videoherosection.webm" type="video/webm">
+                    <!-- Fallback MP4 -->
+                    <source src="videoherosection.mp4" type="video/mp4">
+                    Votre navigateur ne supporte pas la lecture de vidéos.
+                  </video>
                 </div>
+
             </div>
         </div>
     </header>
