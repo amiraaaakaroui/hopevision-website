@@ -1,19 +1,11 @@
-# HopeVision — Coming Soon
 
-This is a minimal, production-ready "Coming Soon" landing page for **hopevision.health**.
+  # HopeVisionAI UI/UX Design (copie) (copie)
 
-## Deploy (Vercel)
-1. Create a new GitHub repo and push these files.
-2. Go to https://vercel.com → New Project → import your repo → Deploy.
-3. In **Project → Settings → Domains**, add `hopevision.health`.
-4. In Porkbun DNS set:
-   - `A @ 76.76.21.21`
-   - `CNAME www cname.vercel-dns.com`
-5. Verify on Vercel. HTTPS auto-activates.
+  This is a code bundle for HopeVisionAI UI/UX Design (copie) (copie). The original project is available at https://www.figma.com/design/yGcUi4g21a9O8r9EA09pcW/HopeVisionAI-UI-UX-Design--copie---copie-.
 
-## Email collection (optional)
-- Replace the `action="#"` of the `<form>` in `index.html` with your Formspree/Getform endpoint.
+  ## Running the code
 
-## Customize
-- Replace `logo.svg` with your brand mark (same filename).
-- Update text, colors in `styles.css`, and social links in `index.html`.
+  Run `npm i` to install the dependencies.
+
+  Run `npm run dev` to start the development server.
+  
