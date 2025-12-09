@@ -1,7 +1,6 @@
 
   # HopeVisionAI
 
-  This is a code bundle for HopeVisionAI UI/UX Design (copie) (copie). The original project is available at https://www.figma.com/design/yGcUi4g21a9O8r9EA09pcW/HopeVisionAI-UI-UX-Design--copie---copie-.
 
   ## Running the code
 
