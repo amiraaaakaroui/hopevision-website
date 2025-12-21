@@ -5,126 +5,222 @@ import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Progress } from './ui/progress';
 import { Screen } from '../App';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabaseClient';
+import type { TimelineEvent, AIReport, Appointment, PatientProfile, Profile } from '../types/database';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
+interface TimelineItem {
+  id: string;
+  status: 'completed' | 'active' | 'pending';
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  details: string[];
+  icon: typeof Activity;
+  color: string;
+  eventType?: string;
+}
+
 export function PatientTimeline({ onNavigate }: Props) {
-  const timeline = [
-    {
-      id: 1,
-      status: 'completed',
-      title: 'Pré-analyse IA',
-      description: 'Analyse multimodale des symptômes',
-      date: '31 Oct 2025',
-      time: '14:30',
-      details: [
-        'Symptômes saisis et analysés',
-        'Pattern vocal détecté',
-        'Marqueurs bio extraits',
-        'Diagnostic IA: Pneumonie atypique (78%)'
-      ],
-      icon: Activity,
-      color: 'green'
-    },
-    {
-      id: 2,
-      status: 'completed',
-      title: 'Anamnèse IA complétée',
-      description: 'Questionnaire médical assisté',
-      date: '31 Oct 2025',
-      time: '14:45',
-      details: [
-        '5 questions répondues',
-        '3 hypothèses écartées',
-        'Confiance augmentée à 78%',
-        'Informations consolidées'
-      ],
-      icon: FileText,
-      color: 'green'
-    },
-    {
-      id: 3,
-      status: 'completed',
-      title: 'Rapport médical généré',
-      description: 'Rapport détaillé avec XAI multimodal',
-      date: '31 Oct 2025',
-      time: '15:00',
-      details: [
-        'Diagnostic consolidé',
-        'Explications XAI',
-        'Plan d\'action défini',
-        'Traçabilité IA/Médecin'
-      ],
-      icon: FileText,
-      color: 'green'
-    },
-    {
-      id: 4,
-      status: 'active',
-      title: 'Consultation programmée',
-      description: 'Téléconsultation avec Dr Karim Ayari',
-      date: '1 Nov 2025',
-      time: '16:00',
-      details: [
-        'Praticien: Dr Karim Ayari',
-        'Type: Téléconsultation',
-        'Durée: 15-30 min',
-        'Rapport partagé avec le médecin'
-      ],
-      icon: Calendar,
-      color: 'blue'
-    },
-    {
-      id: 5,
-      status: 'pending',
-      title: 'Examens complémentaires',
-      description: 'Radiographie thoracique et PCR',
-      date: 'À planifier',
-      time: 'Urgent - 24-48h',
-      details: [
-        'Radiographie thoracique (prioritaire)',
-        'PCR Mycoplasma pneumoniae',
-        'PCR COVID-19 (diagnostic différentiel)',
-        'Prescription en attente de validation'
-      ],
-      icon: Activity,
-      color: 'yellow'
-    },
-    {
-      id: 6,
-      status: 'pending',
-      title: 'Résultats et ajustement',
-      description: 'Intégration des résultats au dossier',
-      date: 'À venir',
-      time: '2-3 jours',
-      details: [
-        'Réception des résultats d\'examens',
-        'Analyse automatique par l\'IA',
-        'Validation médicale',
-        'Ajustement du traitement si nécessaire'
-      ],
-      icon: FileText,
-      color: 'gray'
-    },
-    {
-      id: 7,
-      status: 'pending',
-      title: 'Consultation de suivi',
-      description: 'Contrôle après traitement (J+7)',
-      date: '8 Nov 2025',
-      time: 'À réserver',
-      details: [
-        'Évaluation de l\'évolution',
-        'Ajustement thérapeutique',
-        'Validation de la guérison',
-        'Clôture du dossier'
-      ],
-      icon: Calendar,
-      color: 'gray'
+  const { currentProfile, isPatient } = useAuth();
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [caseSummary, setCaseSummary] = useState<any>(null);
+  const [stats, setStats] = useState({ consultations: 0, exams: 0, documents: 0 });
+
+  useEffect(() => {
+    if (!isPatient || !currentProfile?.patientProfileId) {
+      setLoading(false);
+      return;
     }
-  ];
+
+    loadTimelineData();
+  }, [currentProfile, isPatient]);
+
+  const loadTimelineData = async () => {
+    if (!currentProfile?.patientProfileId) return;
+
+    try {
+      // Load patient profile
+      const { data: patient, error: patientError } = await supabase
+        .from('patient_profiles')
+        .select(`
+          *,
+          profiles (
+            id,
+            full_name,
+            patient_id
+          )
+        `)
+        .eq('id', currentProfile.patientProfileId)
+        .single();
+
+      if (!patientError && patient) {
+        setPatientProfile(patient);
+        setProfile(patient.profiles as Profile);
+      }
+
+      // Load timeline events with related entities
+      const { data: events, error: eventsError } = await supabase
+        .from('timeline_events')
+        .select(`
+          *,
+          related_appointment:appointments!timeline_events_related_appointment_id_fkey (
+            id,
+            appointment_type,
+            scheduled_date,
+            scheduled_time,
+            duration_minutes,
+            doctor_profiles (
+              profiles (
+                full_name
+              )
+            )
+          ),
+          related_ai_report:ai_reports!timeline_events_related_ai_report_id_fkey (
+            id,
+            primary_diagnosis,
+            overall_confidence,
+            overall_severity
+          ),
+          related_pre_analysis:pre_analyses!timeline_events_related_pre_analysis_id_fkey (
+            id,
+            status
+          )
+        `)
+        .eq('patient_profile_id', currentProfile.patientProfileId)
+        .order('event_date', { ascending: false });
+
+      if (eventsError) throw eventsError;
+
+      if (events) {
+        const formattedTimeline: TimelineItem[] = events.map((event: any) => {
+          let details: string[] = [];
+          let description = event.event_description || '';
+
+          // Build details based on event type and related entities
+          if (event.event_type === 'appointment' && event.related_appointment) {
+            const appt = event.related_appointment;
+            const doctorName = appt.doctor_profiles?.profiles?.full_name || 'Médecin';
+            details = [
+              `Praticien: ${doctorName}`,
+              `Type: ${appt.appointment_type === 'teleconsultation' ? 'Téléconsultation' : 'Consultation en présentiel'}`,
+              `Durée: ${appt.duration_minutes || 30} min`,
+              appt.report_shared ? 'Rapport partagé avec le médecin' : ''
+            ].filter(Boolean);
+          } else if (event.event_type === 'ai_report' && event.related_ai_report) {
+            const report = event.related_ai_report;
+            if (report.primary_diagnosis && report.overall_confidence) {
+              details = [
+                `Diagnostic: ${report.primary_diagnosis}`,
+                `Confiance: ${report.overall_confidence}%`,
+                'Explications XAI disponibles',
+                'Plan d\'action défini'
+              ];
+            }
+          } else if (event.event_type === 'pre_analysis' && event.related_pre_analysis) {
+            details = [
+              'Symptômes saisis et analysés',
+              'Analyse multimodale en cours',
+              'Traitement par IA'
+            ];
+          } else if (event.event_type === 'exam') {
+            details = [
+              'Examens complémentaires prescrits',
+              'En attente de résultats'
+            ];
+          }
+
+          const eventDate = new Date(event.event_date);
+          const dateStr = eventDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+          const timeStr = eventDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+          // Determine icon based on event type
+          let IconComponent = Activity;
+          if (event.event_type === 'appointment') IconComponent = Calendar;
+          else if (event.event_type === 'ai_report' || event.event_type === 'doctor_note') IconComponent = FileText;
+          else if (event.event_type === 'exam') IconComponent = Activity;
+
+          return {
+            id: event.id,
+            status: (event.status || 'pending') as 'completed' | 'active' | 'pending',
+            title: event.event_title,
+            description: description || event.event_title,
+            date: dateStr,
+            time: timeStr,
+            details: details.length > 0 ? details : [description],
+            icon: IconComponent,
+            color: event.status === 'completed' ? 'green' : event.status === 'active' ? 'blue' : 'gray',
+            eventType: event.event_type
+          };
+        });
+
+        setTimeline(formattedTimeline);
+
+        // Load latest AI report for case summary
+        const { data: latestReport } = await supabase
+          .from('ai_reports')
+          .select('*')
+          .eq('patient_profile_id', currentProfile.patientProfileId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (latestReport) {
+          setCaseSummary({
+            diagnosis: latestReport.primary_diagnosis || 'En attente',
+            confidence: latestReport.overall_confidence || 0,
+            severity: latestReport.overall_severity || 'medium'
+          });
+        }
+
+        // Load stats
+        const { data: appointments } = await supabase
+          .from('appointments')
+          .select('id')
+          .eq('patient_profile_id', currentProfile.patientProfileId);
+
+        const { data: exams } = await supabase
+          .from('exam_results')
+          .select('id')
+          .eq('patient_profile_id', currentProfile.patientProfileId);
+
+        const { data: documents } = await supabase
+          .from('documents')
+          .select('id')
+          .eq('patient_profile_id', currentProfile.patientProfileId);
+
+        setStats({
+          consultations: appointments?.length || 0,
+          exams: exams?.length || 0,
+          documents: documents?.length || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error loading timeline:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return '??';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  const completedSteps = timeline.filter(t => t.status === 'completed').length;
+  const totalSteps = timeline.length;
+  const progressPercentage = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+
+  const activeEvent = timeline.find(t => t.status === 'active');
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -148,9 +244,7 @@ export function PatientTimeline({ onNavigate }: Props) {
     }
   };
 
-  const completedSteps = timeline.filter(t => t.status === 'completed').length;
-  const totalSteps = timeline.length;
-  const progressPercentage = (completedSteps / totalSteps) * 100;
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -171,12 +265,14 @@ export function PatientTimeline({ onNavigate }: Props) {
               <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarFallback className="bg-blue-100 text-blue-600">
-                    NB
+                    {getInitials(profile?.full_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <h1 className="text-gray-900">Timeline de prise en charge</h1>
-                  <p className="text-xs text-gray-500">Nadia Ben Salem • ID: PAT-2025-00234</p>
+                  <p className="text-xs text-gray-500">
+                    {profile?.full_name || 'Patient'} {patientProfile?.patient_id ? `• ID: ${patientProfile.patient_id}` : ''}
+                  </p>
                 </div>
               </div>
             </div>
@@ -192,16 +288,22 @@ export function PatientTimeline({ onNavigate }: Props) {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Timeline */}
           <div className="lg:col-span-2">
-            <Card className="p-6 mb-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-gray-900">Progression globale</h2>
-                <span className="text-blue-600">{completedSteps}/{totalSteps} étapes</span>
-              </div>
-              <Progress value={progressPercentage} className="h-3" />
-            </Card>
+            {loading ? (
+              <Card className="p-8 text-center">
+                <p className="text-gray-500">Chargement de la timeline...</p>
+              </Card>
+            ) : timeline.length > 0 ? (
+              <>
+                <Card className="p-6 mb-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-gray-900">Progression globale</h2>
+                    <span className="text-blue-600">{completedSteps}/{totalSteps} étapes</span>
+                  </div>
+                  <Progress value={progressPercentage} className="h-3" />
+                </Card>
 
-            <div className="space-y-6">
-              {timeline.map((item, index) => (
+                <div className="space-y-6">
+                  {timeline.map((item, index) => (
                 <div key={item.id} className="relative">
                   {/* Connecting Line */}
                   {index < timeline.length - 1 && (
@@ -289,69 +391,82 @@ export function PatientTimeline({ onNavigate }: Props) {
                     </div>
                   </Card>
                 </div>
-              ))}
-            </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <Card className="p-8 text-center">
+                <p className="text-gray-500">Aucun événement dans la timeline</p>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            <Card className="p-6">
-              <h3 className="text-gray-900 mb-4">Résumé du cas</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Diagnostic</span>
-                  <span className="text-gray-900">Pneumonie atypique</span>
+            {caseSummary && (
+              <Card className="p-6">
+                <h3 className="text-gray-900 mb-4">Résumé du cas</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Diagnostic</span>
+                    <span className="text-gray-900">{caseSummary.diagnosis}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Confiance IA</span>
+                    <span className="text-blue-600">{caseSummary.confidence}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Gravité</span>
+                    <Badge className={
+                      caseSummary.severity === 'high' ? 'bg-red-600' :
+                      caseSummary.severity === 'medium' ? 'bg-yellow-500' :
+                      'bg-green-600'
+                    }>
+                      {caseSummary.severity === 'high' ? 'Élevée' :
+                       caseSummary.severity === 'medium' ? 'Modérée' :
+                       'Faible'}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Confiance IA</span>
-                  <span className="text-blue-600">78%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Gravité</span>
-                  <Badge className="bg-yellow-500">Modérée</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Médecin</span>
-                  <span className="text-gray-900">Dr Karim Ayari</span>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            )}
 
-            <Card className="p-6 bg-blue-50 border-blue-200">
-              <h3 className="text-gray-900 mb-3">Étape actuelle</h3>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-white" />
+            {activeEvent && (
+              <Card className="p-6 bg-blue-50 border-blue-200">
+                <h3 className="text-gray-900 mb-3">Étape actuelle</h3>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                    <activeEvent.icon className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-gray-900">{activeEvent.title}</p>
+                    <p className="text-sm text-gray-600">{activeEvent.date} à {activeEvent.time}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-gray-900">Consultation programmée</p>
-                  <p className="text-sm text-gray-600">1 Nov 2025 à 16:00</p>
-                </div>
-              </div>
-              <p className="text-sm text-gray-700">
-                Votre consultation avec le Dr Karim Ayari est confirmée. 
-                Un lien de vidéoconférence vous sera envoyé 15 minutes avant.
-              </p>
-            </Card>
+                <p className="text-sm text-gray-700">{activeEvent.description}</p>
+              </Card>
+            )}
 
             <Card className="p-6">
               <h3 className="text-gray-900 mb-4">Statistiques</h3>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Durée totale</span>
-                  <span className="text-gray-900">8 jours prévus</span>
-                </div>
+                {timeline.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Événements</span>
+                    <span className="text-gray-900">{timeline.length} au total</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600">Consultations</span>
-                  <span className="text-gray-900">2 prévues</span>
+                  <span className="text-gray-900">{stats.consultations}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Examens</span>
-                  <span className="text-gray-900">3 prescrits</span>
+                  <span className="text-gray-900">{stats.exams}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Documents</span>
-                  <span className="text-gray-900">1 rapport</span>
+                  <span className="text-gray-900">{stats.documents}</span>
                 </div>
               </div>
             </Card>

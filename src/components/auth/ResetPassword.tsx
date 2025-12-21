@@ -3,6 +3,7 @@ import { Brain, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Screen } from '../../App';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
@@ -14,11 +15,31 @@ export function ResetPassword({ onNavigate }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === confirmPassword) {
+    if (password !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: password,
+      });
+
+      if (updateError) throw updateError;
+
       setSubmitted(true);
+    } catch (err: any) {
+      console.error('Reset password error:', err);
+      setError(err.message || 'Erreur lors de la mise à jour du mot de passe. Le lien peut avoir expiré.');
+      setLoading(false);
     }
   };
 
@@ -58,6 +79,13 @@ export function ResetPassword({ onNavigate }: Props) {
             <p className="text-gray-600 text-center mb-8">
               Choisissez un mot de passe sécurisé
             </p>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -119,9 +147,9 @@ export function ResetPassword({ onNavigate }: Props) {
               <Button 
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700 py-3"
-                disabled={!password || password !== confirmPassword}
+                disabled={!password || password !== confirmPassword || loading}
               >
-                Mettre à jour mon mot de passe
+                {loading ? 'Mise à jour...' : 'Mettre à jour mon mot de passe'}
               </Button>
             </form>
           </>

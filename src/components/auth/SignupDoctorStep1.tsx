@@ -3,43 +3,213 @@ import { Brain, Stethoscope, User, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Screen } from '../../App';
+import { supabase } from '../../lib/supabaseClient';
+
 
 interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
 export function SignupDoctorStep1({ onNavigate }: Props) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [emailConfirmationRequired, setEmailConfirmationRequired] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
-    specialty: '',
-    referralSource: '',
     confirmProfessional: false
   });
   const [showPassword, setShowPassword] = useState(false);
 
-  const specialties = [
-    'Médecine générale',
-    'Cardiologie',
-    'Pneumologie',
-    'Neurologie',
-    'Pédiatrie',
-    'Gynécologie',
-    'Dermatologie',
-    'Psychiatrie',
-    'Radiologie',
-    'Autre'
-  ];
 
-  const referralOptions = ['Google', 'Réseaux sociaux', 'Médecin', 'Hôpital', 'Congrès médical', 'Publication scientifique', 'Autre'];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleGoogleSignup = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/?role=doctor`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        console.error('Erreur Google signup médecin:', error.message);
+        setError('Erreur lors de la connexion avec Google. Veuillez réessayer.');
+        setLoading(false);
+      }
+      // If successful, browser will redirect to Google
+    } catch (err: any) {
+      console.error('Erreur Google signup:', err);
+      setError('Erreur lors de la connexion avec Google.');
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.password === formData.confirmPassword && formData.confirmProfessional) {
+
+    // Validate password match and professional confirmation
+    if (formData.password !== formData.confirmPassword || !formData.confirmProfessional) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // EMAIL SIGNUP MODE: Create new account
+      // 1. Create auth user
+      // NOTE: signUp() may or may not return a session depending on email confirmation settings
+      // We store role in metadata so the database trigger can create the profile after email confirmation
+
+      // ROBUST FIX: Add role to the redirect URL. This ensures that even if sessionStorage is lost
+      // (e.g. opening email on mobile or new tab), the App knows this is a doctor confirmation.
+      const redirectTo = `${window.location.origin}/?role=doctor`;
+
+      console.log('[SignupDoctorStep1] Signing up with redirect:', redirectTo);
+
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo: redirectTo,
+          data: {
+            full_name: `${formData.firstName} ${formData.lastName}`,
+            role: 'doctor', // Store role in metadata for trigger
+            signup_step1_data: JSON.stringify(formData), // Store form data for Step 2/3 after confirmation
+          }
+        }
+      });
+
+      // CRITICAL: Check for errors and ensure user was created
+      if (signUpError) {
+        console.error('[SignupDoctorStep1] SignUp error:', signUpError);
+        // Check if it's a user already exists error
+        if (signUpError.message?.includes('already registered') || signUpError.message?.includes('already exists')) {
+          throw new Error('Cet email est déjà enregistré. Veuillez vous connecter ou utiliser un autre email.');
+        }
+        throw signUpError;
+      }
+
+      if (!authData.user) {
+        console.error('[SignupDoctorStep1] No user returned from signUp');
+        throw new Error('Erreur lors de la création du compte. Aucun utilisateur créé.');
+      }
+
+      // Verify user was actually created in auth.users
+      console.log('[SignupDoctorStep1] User created successfully:', {
+        id: authData.user.id,
+        email: authData.user.email,
+        email_confirmed_at: authData.user.email_confirmed_at,
+        has_session: !!authData.session
+      });
+
+      const userId = authData.user.id;
+
+      // 2. Check if email confirmation is required
+      // If signUp() returns no session, email confirmation is required
+      if (!authData.session) {
+        // No session available - this happens when email confirmation is required
+        // The database trigger will create the profile automatically after email confirmation
+        // Store form data in sessionStorage so Step 2/3 can be completed after confirmation
+        sessionStorage.setItem('signup-doctor-step1', JSON.stringify(formData));
+        sessionStorage.setItem('signup-doctor-pending-confirmation', 'true');
+        sessionStorage.setItem('signup-doctor-email', formData.email);
+        sessionStorage.setItem('pending-signup-role', 'doctor'); // Store role for profile creation
+
+        // Show success message - user needs to check email
+        setEmailConfirmationRequired(true);
+        setError(null);
+        setLoading(false);
+        return; // Stop here - user must confirm email first
+      }
+
+      // 3. If session is available (email confirmation disabled), proceed with profile creation
+      const session = authData.session;
+
+      // Verify the session user matches
+      if (session.user.id !== userId) {
+        throw new Error('Erreur de session: l\'utilisateur ne correspond pas.');
+      }
+
+      // 4. Create profile (ONCE - this is the only place profiles row is created if email confirmation is OFF)
+      // RLS policy requires: WITH CHECK (user_id = auth.uid())
+      // At this point, session is established, so auth.uid() should equal userId
+      const profileInsertData = {
+        user_id: userId, // Must match auth.uid() for RLS
+        role: 'doctor' as const,
+        full_name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+      };
+
+      console.log('[SignupDoctorStep1] Profile insert payload:', profileInsertData);
+
+      const { data: newProfile, error: profileError } = await supabase
+        .from('profiles')
+        .insert(profileInsertData)
+        .select('id')
+        .single();
+
+      if (profileError) {
+        // If profile already exists (edge case), get it
+        if (profileError.code === '23505') { // Unique violation
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single();
+
+          if (existingProfile) {
+            sessionStorage.setItem('signup-doctor-step1', JSON.stringify(formData));
+            sessionStorage.setItem('signup-doctor-profile-id', existingProfile.id);
+            onNavigate('signup-doctor-step2');
+            return;
+          }
+        }
+        throw profileError;
+      }
+
+      if (!newProfile) throw new Error('Erreur lors de la création du profil');
+
+      // Store step1 data and profile ID for step2
+      sessionStorage.setItem('signup-doctor-step1', JSON.stringify(formData));
+      sessionStorage.setItem('signup-doctor-profile-id', newProfile.id);
+
       onNavigate('signup-doctor-step2');
+    } catch (err: any) {
+      console.error('[SignupDoctorStep1] Signup error:', err);
+
+      // Provide user-friendly error messages
+      let errorMessage = 'Erreur lors de la création du compte. Veuillez réessayer.';
+
+      if (err.message) {
+        errorMessage = err.message;
+      } else if (err.code) {
+        switch (err.code) {
+          case 'user_already_registered':
+            errorMessage = 'Cet email est déjà enregistré. Veuillez vous connecter.';
+            break;
+          case 'signup_disabled':
+            errorMessage = 'L\'inscription est temporairement désactivée. Veuillez contacter le support.';
+            break;
+          default:
+            errorMessage = `Erreur: ${err.code}. Veuillez réessayer.`;
+        }
+      }
+
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -77,8 +247,30 @@ export function SignupDoctorStep1({ onNavigate }: Props) {
             <Stethoscope className="w-8 h-8 text-blue-600" />
           </div>
 
-          <h2 className="text-gray-900 text-center mb-2">Créer mon compte Médecin</h2>
-          <p className="text-gray-600 text-center mb-8">Rejoignez la communauté médicale HopeVisionAI</p>
+          <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">Inscription Médecin</h2>
+          <p className="text-gray-600 text-center mb-8">Rejoignez la communauté HopeVisionAI</p>
+
+          {/* Google Sign-up Button */}
+          <button
+            type="button"
+            onClick={handleGoogleSignup}
+            disabled={loading}
+            className="w-full mb-4 flex items-center justify-center gap-3 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <img
+              src="https://developers.google.com/identity/images/g-logo.png"
+              alt="Google"
+              className="w-5 h-5"
+            />
+            <span>Continuer avec Google</span>
+          </button>
+
+          {/* Separator */}
+          <div className="flex items-center my-6">
+            <div className="flex-grow h-px bg-gray-200" />
+            <span className="px-4 text-xs text-gray-500 uppercase font-medium">ou</span>
+            <div className="flex-grow h-px bg-gray-200" />
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid md:grid-cols-2 gap-4">
@@ -86,14 +278,14 @@ export function SignupDoctorStep1({ onNavigate }: Props) {
                 <label className="block text-gray-700 mb-2">Prénom</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Karim" required />
+                  <input type="text" value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Karim" required />
                 </div>
               </div>
               <div>
                 <label className="block text-gray-700 mb-2">Nom</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type="text" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ayari" required />
+                  <input type="text" value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ayari" required />
                 </div>
               </div>
             </div>
@@ -102,7 +294,7 @@ export function SignupDoctorStep1({ onNavigate }: Props) {
               <label className="block text-gray-700 mb-2">E-mail professionnel</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="dr.ayari@hopital.tn" required />
+                <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="dr.ayari@hopital.tn" required />
               </div>
             </div>
 
@@ -111,7 +303,7 @@ export function SignupDoctorStep1({ onNavigate }: Props) {
                 <label className="block text-gray-700 mb-2">Mot de passe</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••" minLength={8} required />
+                  <input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••" minLength={8} required />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -119,37 +311,51 @@ export function SignupDoctorStep1({ onNavigate }: Props) {
               </div>
               <div>
                 <label className="block text-gray-700 mb-2">Confirmer</label>
-                <input type="password" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••" required />
+                <input type="password" value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••" required />
               </div>
             </div>
 
-            <div>
-              <label className="block text-gray-700 mb-2">Spécialité principale</label>
-              <select value={formData.specialty} onChange={(e) => setFormData({...formData, specialty: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required>
-                <option value="">Sélectionnez votre spécialité</option>
-                {specialties.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
 
-            <div>
-              <label className="block text-gray-700 mb-2">Comment avez-vous entendu parler de HopeVisionAI ?</label>
-              <select value={formData.referralSource} onChange={(e) => setFormData({...formData, referralSource: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required>
-                <option value="">Sélectionnez une option</option>
-                {referralOptions.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
 
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
               <label className="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" checked={formData.confirmProfessional} onChange={(e) => setFormData({...formData, confirmProfessional: e.target.checked})} className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1" required />
+                <input type="checkbox" checked={formData.confirmProfessional} onChange={(e) => setFormData({ ...formData, confirmProfessional: e.target.checked })} className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1" required />
                 <span className="text-sm text-gray-700">
                   Je confirme être un professionnel de santé autorisé à exercer.
                 </span>
               </label>
             </div>
 
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 py-3" disabled={!formData.confirmProfessional || formData.password !== formData.confirmPassword}>
-              Continuer → Étape 2
+            {/* Email Confirmation Required Message */}
+            {emailConfirmationRequired && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                      Vérification de l'email requise
+                    </h3>
+                    <p className="text-sm text-blue-800 mb-2">
+                      Nous avons envoyé un email de confirmation à <strong>{formData.email}</strong>.
+                      Veuillez cliquer sur le lien dans l'email pour confirmer votre compte.
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      Une fois votre email confirmé, vous pourrez continuer avec les étapes suivantes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 py-3" disabled={!formData.confirmProfessional || formData.password !== formData.confirmPassword || loading || emailConfirmationRequired}>
+              {loading ? 'Création du compte...' : emailConfirmationRequired ? 'Vérifiez votre email' : 'Continuer → Étape 2'}
             </Button>
           </form>
 

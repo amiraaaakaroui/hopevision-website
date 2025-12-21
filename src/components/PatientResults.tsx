@@ -5,35 +5,179 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Screen } from '../App';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import type { AIReport, DiagnosticHypothesis } from '../types/database';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
+interface ResultItem {
+  disease: string;
+  confidence: number;
+  severity: 'low' | 'medium' | 'high';
+  keywords: string[];
+  explanation: string;
+}
+
 export function PatientResults({ onNavigate }: Props) {
-  const results = [
-    {
-      disease: 'Pneumonie atypique',
-      confidence: 71,
-      severity: 'medium',
-      keywords: ['toux sèche', 'fièvre', 'essoufflement', 'CRP élevée'],
-      explanation: 'L\'IA a détecté une combinaison de symptômes respiratoires persistants avec des marqueurs inflammatoires élevés, caractéristiques d\'une pneumonie atypique.'
-    },
-    {
-      disease: 'Bronchite aiguë',
-      confidence: 18,
-      severity: 'low',
-      keywords: ['toux', 'durée 5 jours'],
-      explanation: 'La toux persistante pourrait indiquer une bronchite, mais d\'autres symptômes orientent vers un diagnostic différent.'
-    },
-    {
-      disease: 'COVID-19',
-      confidence: 11,
-      severity: 'medium',
-      keywords: ['fièvre', 'fatigue'],
-      explanation: 'Certains symptômes sont compatibles avec la COVID-19, mais la probabilité est plus faible selon le contexte clinique.'
+  const [results, setResults] = useState<ResultItem[]>([]);
+  const [aiReport, setAiReport] = useState<AIReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [preAnalysisId, setPreAnalysisId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get pre_analysis_id from sessionStorage
+    const storedId = sessionStorage.getItem('currentPreAnalysisId');
+    if (storedId) {
+      setPreAnalysisId(storedId);
+      loadAIReportWithGeneration(storedId);
+    } else {
+      setLoading(false);
     }
-  ];
+  }, []);
+
+  const loadAIReportWithGeneration = async (preAnalysisId: string) => {
+    try {
+      // FIXED: Add retry logic with exponential backoff
+      const maxRetries = 5;
+      let retryCount = 0;
+      let reportExists = false;
+
+      while (retryCount < maxRetries && !reportExists) {
+        // Check if report exists
+        const { data: existingReport, error: checkError } = await supabase
+          .from('ai_reports')
+          .select('id')
+          .eq('pre_analysis_id', preAnalysisId)
+          .maybeSingle();
+
+        if (checkError) {
+          console.error('[PatientResults] Error checking report:', checkError);
+        }
+
+        if (existingReport) {
+          reportExists = true;
+          break;
+        }
+
+        // Check pre-analysis status
+        const { data: preAnalysis, error: preAnalysisError } = await supabase
+          .from('pre_analyses')
+          .select('status, ai_processing_status')
+          .eq('id', preAnalysisId)
+          .single();
+
+        if (preAnalysisError) {
+          console.error('[PatientResults] Error loading pre-analysis:', preAnalysisError);
+          break;
+        }
+
+        if (preAnalysis) {
+          if (preAnalysis.ai_processing_status === 'processing') {
+            // Still processing, wait and retry
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 10000); // Exponential backoff, max 10s
+            await new Promise(resolve => setTimeout(resolve, delay));
+            retryCount++;
+            continue;
+          }
+
+          if (preAnalysis.status === 'submitted' || preAnalysis.status === 'draft' || preAnalysis.ai_processing_status === 'pending') {
+            // Generate AI report
+            console.log('[PatientResults] Generating AI report (attempt', retryCount + 1, ')...');
+            try {
+              const { generateAndSaveAIReport } = await import('../services/aiReportService');
+              await generateAndSaveAIReport(preAnalysisId);
+              console.log('[PatientResults] AI report generated successfully');
+              
+              // Wait a bit for DB to be consistent
+              await new Promise(resolve => setTimeout(resolve, 500));
+              reportExists = true;
+              break;
+            } catch (error: any) {
+              console.error('[PatientResults] Error generating report:', error);
+              
+              // If it's a processing error, wait and retry
+              if (error.message?.includes('processing') && retryCount < maxRetries - 1) {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                retryCount++;
+                continue;
+              }
+              
+              alert(`Erreur lors de la génération du rapport AI: ${error.message || 'Erreur inconnue'}`);
+              setLoading(false);
+              return;
+            }
+          } else if (preAnalysis.ai_processing_status === 'failed') {
+            alert('La génération du rapport AI a échoué. Veuillez réessayer.');
+            setLoading(false);
+            return;
+          }
+        }
+
+        retryCount++;
+        if (retryCount < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+
+      // Load the report
+      await loadAIReport(preAnalysisId);
+    } catch (error: any) {
+      console.error('[PatientResults] Error loading report:', error);
+      alert(`Erreur lors du chargement du rapport: ${error.message || 'Erreur inconnue'}`);
+      setLoading(false);
+    }
+  };
+
+  const loadAIReport = async (preAnalysisId: string) => {
+    try {
+      // Load AI report with diagnostic hypotheses
+      const { data: report, error: reportError } = await supabase
+        .from('ai_reports')
+        .select(`
+          *,
+          diagnostic_hypotheses (
+            *
+          )
+        `)
+        .eq('pre_analysis_id', preAnalysisId)
+        .single();
+
+      if (reportError) {
+        // If report doesn't exist yet, it might still be processing
+        console.log('AI report not found, may still be processing');
+        setLoading(false);
+        return;
+      }
+
+      if (report) {
+        setAiReport(report as AIReport);
+        
+        // Format hypotheses as results
+        const hypotheses = (report.diagnostic_hypotheses || []) as DiagnosticHypothesis[];
+        const formattedResults: ResultItem[] = hypotheses
+          .filter(h => !h.is_excluded)
+          .map(h => ({
+            disease: h.disease_name,
+            confidence: h.confidence,
+            severity: h.severity || 'medium',
+            keywords: h.keywords || [],
+            explanation: h.explanation || 'Analyse basée sur les symptômes décrits.'
+          }))
+          .sort((a, b) => b.confidence - a.confidence);
+
+        setResults(formattedResults);
+      }
+    } catch (error) {
+      console.error('Error loading AI report:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -98,26 +242,53 @@ export function PatientResults({ onNavigate }: Props) {
         </div>
 
         {/* Overall Severity */}
-        <Card className="p-6 mb-6 border-l-4 border-yellow-500">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                <Info className="w-6 h-6 text-yellow-600" />
+        {aiReport && (
+          <Card className={`p-6 mb-6 border-l-4 ${
+            aiReport.overall_severity === 'high' ? 'border-red-500' :
+            aiReport.overall_severity === 'medium' ? 'border-yellow-500' :
+            'border-green-500'
+          }`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  aiReport.overall_severity === 'high' ? 'bg-red-100' :
+                  aiReport.overall_severity === 'medium' ? 'bg-yellow-100' :
+                  'bg-green-100'
+                }`}>
+                  <Info className={`w-6 h-6 ${
+                    aiReport.overall_severity === 'high' ? 'text-red-600' :
+                    aiReport.overall_severity === 'medium' ? 'text-yellow-600' :
+                    'text-green-600'
+                  }`} />
+                </div>
+                <div>
+                  <h3 className="text-gray-900">Niveau de gravité détecté</h3>
+                  <p className="text-gray-600">
+                    {aiReport.recommendation_action || 'Consultation médicale recommandée'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-gray-900">Niveau de gravité détecté</h3>
-                <p className="text-gray-600">Consultation médicale recommandée</p>
-              </div>
+              <Badge className={
+                aiReport.overall_severity === 'high' ? 'bg-red-600' :
+                aiReport.overall_severity === 'medium' ? 'bg-yellow-500' :
+                'bg-green-600'
+              }>
+                {aiReport.overall_severity === 'high' ? 'Élevé' :
+                 aiReport.overall_severity === 'medium' ? 'Modéré' :
+                 'Faible'}
+              </Badge>
             </div>
-            <Badge className="bg-yellow-500 text-white">
-              Modéré
-            </Badge>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         {/* Results Cards */}
-        <div className="space-y-4 mb-8">
-          {results.map((result, index) => (
+        {loading ? (
+          <Card className="p-8 text-center">
+            <p className="text-gray-500">Chargement des résultats...</p>
+          </Card>
+        ) : results.length > 0 ? (
+          <div className="space-y-4 mb-8">
+            {results.map((result, index) => (
             <Card key={index} className="p-6 hover:shadow-lg transition-shadow">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
@@ -181,8 +352,16 @@ export function PatientResults({ onNavigate }: Props) {
                 ))}
               </div>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <Card className="p-8 text-center mb-8">
+            <p className="text-gray-500 mb-4">Aucun résultat disponible</p>
+            <p className="text-sm text-gray-400">
+              L'analyse IA est peut-être encore en cours de traitement.
+            </p>
+          </Card>
+        )}
 
         {/* Info Box */}
         <Card className="p-6 bg-blue-50 border-blue-200 mb-6">
@@ -221,7 +400,13 @@ export function PatientResults({ onNavigate }: Props) {
           </Button>
           <Button 
             className="flex-1 bg-blue-600 hover:bg-blue-700"
-            onClick={() => onNavigate('patient-detailed-report')}
+            onClick={() => {
+              if (preAnalysisId) {
+                sessionStorage.setItem('currentPreAnalysisId', preAnalysisId);
+              }
+              onNavigate('patient-detailed-report');
+            }}
+            disabled={!aiReport}
           >
             Générer un rapport détaillé
           </Button>

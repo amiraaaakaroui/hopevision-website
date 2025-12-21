@@ -7,12 +7,190 @@ import { Textarea } from './ui/textarea';
 import { Progress } from './ui/progress';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Screen } from '../App';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabaseClient';
+import type { PatientProfile, Profile, AIReport, DiagnosticHypothesis, PreAnalysis, Document, DoctorNote, ExamResult } from '../types/database';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
 export function DoctorPatientFile({ onNavigate }: Props) {
+  const { currentProfile, isDoctor } = useAuth();
+  const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [aiReport, setAiReport] = useState<AIReport | null>(null);
+  const [hypotheses, setHypotheses] = useState<DiagnosticHypothesis[]>([]);
+  const [preAnalysis, setPreAnalysis] = useState<PreAnalysis | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [doctorNotes, setDoctorNotes] = useState<DoctorNote[]>([]);
+  const [examResults, setExamResults] = useState<ExamResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [noteText, setNoteText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isDoctor || !currentProfile?.doctorProfileId) {
+      setLoading(false);
+      return;
+    }
+
+    const patientId = sessionStorage.getItem('selectedPatientProfileId');
+    const preAnalysisId = sessionStorage.getItem('selectedPreAnalysisId');
+    const aiReportId = sessionStorage.getItem('selectedAiReportId');
+
+    if (patientId) {
+      loadPatientData(patientId, preAnalysisId || undefined, aiReportId || undefined);
+    } else {
+      setLoading(false);
+    }
+  }, [currentProfile, isDoctor]);
+
+  const loadPatientData = async (patientProfileId: string, preAnalysisId?: string, aiReportId?: string) => {
+    try {
+      // Load patient profile
+      const { data: patient, error: patientError } = await supabase
+        .from('patient_profiles')
+        .select(`
+          *,
+          profiles (
+            id,
+            full_name,
+            date_of_birth,
+            email
+          )
+        `)
+        .eq('id', patientProfileId)
+        .single();
+
+      if (patientError) throw patientError;
+      if (patient) {
+        setPatientProfile(patient);
+        setProfile(patient.profiles as Profile);
+      }
+
+      // Load AI report
+      if (aiReportId) {
+        const { data: report, error: reportError } = await supabase
+          .from('ai_reports')
+          .select(`
+            *,
+            diagnostic_hypotheses (*)
+          `)
+          .eq('id', aiReportId)
+          .single();
+
+        if (!reportError && report) {
+          setAiReport(report as AIReport);
+          setHypotheses((report.diagnostic_hypotheses || []) as DiagnosticHypothesis[]);
+        }
+      } else if (preAnalysisId) {
+        const { data: report, error: reportError } = await supabase
+          .from('ai_reports')
+          .select(`
+            *,
+            diagnostic_hypotheses (*)
+          `)
+          .eq('pre_analysis_id', preAnalysisId)
+          .single();
+
+        if (!reportError && report) {
+          setAiReport(report as AIReport);
+          setHypotheses((report.diagnostic_hypotheses || []) as DiagnosticHypothesis[]);
+        }
+      }
+
+      // Load pre-analysis
+      if (preAnalysisId) {
+        const { data: preAnalysisData, error: preAnalysisError } = await supabase
+          .from('pre_analyses')
+          .select('*')
+          .eq('id', preAnalysisId)
+          .single();
+
+        if (!preAnalysisError && preAnalysisData) {
+          setPreAnalysis(preAnalysisData as PreAnalysis);
+        }
+      }
+
+      // Load documents
+      const { data: docs } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('patient_profile_id', patientProfileId)
+        .order('uploaded_at', { ascending: false });
+
+      if (docs) setDocuments(docs as Document[]);
+
+      // Load doctor notes
+      const { data: notes } = await supabase
+        .from('doctor_notes')
+        .select('*')
+        .eq('patient_profile_id', patientProfileId)
+        .eq('doctor_profile_id', currentProfile.doctorProfileId)
+        .order('created_at', { ascending: false });
+
+      if (notes) setDoctorNotes(notes as DoctorNote[]);
+
+      // Load exam results
+      const { data: exams } = await supabase
+        .from('exam_results')
+        .select('*')
+        .eq('patient_profile_id', patientProfileId)
+        .order('exam_date', { ascending: false });
+
+      if (exams) setExamResults(exams as ExamResult[]);
+    } catch (error) {
+      console.error('Error loading patient data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveNote = async () => {
+    if (!noteText.trim() || !patientProfile || !currentProfile?.doctorProfileId || saving) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('doctor_notes')
+        .insert({
+          patient_profile_id: patientProfile.id,
+          doctor_profile_id: currentProfile.doctorProfileId,
+          note_text: noteText,
+        });
+
+      if (error) throw error;
+
+      setNoteText('');
+      // Reload notes
+      const { data: notes } = await supabase
+        .from('doctor_notes')
+        .select('*')
+        .eq('patient_profile_id', patientProfile.id)
+        .eq('doctor_profile_id', currentProfile.doctorProfileId)
+        .order('created_at', { ascending: false });
+
+      if (notes) setDoctorNotes(notes as DoctorNote[]);
+    } catch (error) {
+      console.error('Error saving note:', error);
+      alert('Erreur lors de la sauvegarde de la note');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return '??';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  const calculateAge = (dob?: string) => {
+    if (!dob) return null;
+    const age = Math.floor((new Date().getTime() - new Date(dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    return age;
+  };
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -36,11 +214,24 @@ export function DoctorPatientFile({ onNavigate }: Props) {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h1 className="text-gray-900">Nadia Ben Salem</h1>
-                  <p className="text-xs text-gray-500">34 ans • ID: PAT-2025-00234</p>
+                  <h1 className="text-gray-900">{profile?.full_name || 'Patient'}</h1>
+                  <p className="text-xs text-gray-500">
+                    {calculateAge(profile?.date_of_birth) !== null ? `${calculateAge(profile?.date_of_birth)} ans` : ''} 
+                    {patientProfile?.patient_id ? ` • ID: ${patientProfile.patient_id}` : ''}
+                  </p>
                 </div>
               </div>
-              <Badge className="bg-yellow-500">Consultation recommandée</Badge>
+              {aiReport && (
+                <Badge className={
+                  aiReport.overall_severity === 'high' ? 'bg-red-600' :
+                  aiReport.overall_severity === 'medium' ? 'bg-yellow-500' :
+                  'bg-green-600'
+                }>
+                  {aiReport.overall_severity === 'high' ? 'Urgence élevée' :
+                   aiReport.overall_severity === 'medium' ? 'Consultation recommandée' :
+                   'Surveillance'}
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm">
@@ -63,51 +254,74 @@ export function DoctorPatientFile({ onNavigate }: Props) {
             <Card className="p-6">
               <h3 className="text-gray-900 mb-4">Informations patient</h3>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Âge</span>
-                  <span className="text-gray-900">34 ans</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Sexe</span>
-                  <span className="text-gray-900">Féminin</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Groupe sanguin</span>
-                  <span className="text-gray-900">A+</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Allergies</span>
-                  <span className="text-gray-900">Pénicilline</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Poids</span>
-                  <span className="text-gray-900">65 kg</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Taille</span>
-                  <span className="text-gray-900">168 cm</span>
-                </div>
+                {calculateAge(profile?.date_of_birth) !== null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Âge</span>
+                    <span className="text-gray-900">{calculateAge(profile?.date_of_birth)} ans</span>
+                  </div>
+                )}
+                {patientProfile?.gender && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Sexe</span>
+                    <span className="text-gray-900">
+                      {patientProfile.gender === 'female' ? 'Féminin' :
+                       patientProfile.gender === 'male' ? 'Masculin' :
+                       'Autre'}
+                    </span>
+                  </div>
+                )}
+                {patientProfile?.blood_group && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Groupe sanguin</span>
+                    <span className="text-gray-900">{patientProfile.blood_group}</span>
+                  </div>
+                )}
+                {patientProfile?.allergies && patientProfile.allergies.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Allergies</span>
+                    <span className="text-gray-900">{patientProfile.allergies.join(', ')}</span>
+                  </div>
+                )}
+                {patientProfile?.weight_kg && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Poids</span>
+                    <span className="text-gray-900">{patientProfile.weight_kg} kg</span>
+                  </div>
+                )}
+                {patientProfile?.height_cm && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Taille</span>
+                    <span className="text-gray-900">{patientProfile.height_cm} cm</span>
+                  </div>
+                )}
               </div>
             </Card>
 
-            <Card className="p-6">
-              <h3 className="text-gray-900 mb-4">Antécédents</h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Médicaux</p>
-                  <Badge variant="outline" className="mr-2 mb-2">Asthme léger</Badge>
-                  <Badge variant="outline" className="mb-2">Anémie</Badge>
+            {patientProfile && (patientProfile.medical_history || patientProfile.surgical_history || patientProfile.family_history) && (
+              <Card className="p-6">
+                <h3 className="text-gray-900 mb-4">Antécédents</h3>
+                <div className="space-y-3">
+                  {patientProfile.medical_history && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Médicaux</p>
+                      <p className="text-sm text-gray-900">{patientProfile.medical_history}</p>
+                    </div>
+                  )}
+                  {patientProfile.surgical_history && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Chirurgicaux</p>
+                      <p className="text-sm text-gray-900">{patientProfile.surgical_history}</p>
+                    </div>
+                  )}
+                  {patientProfile.family_history && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Familiaux</p>
+                      <p className="text-sm text-gray-900">{patientProfile.family_history}</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Chirurgicaux</p>
-                  <p className="text-sm text-gray-900">Appendicectomie (2018)</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Familiaux</p>
-                  <p className="text-sm text-gray-900">Diabète type 2 (père)</p>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            )}
 
             <Card className="p-6">
               <h3 className="text-gray-900 mb-4">Analyses récentes</h3>
@@ -162,47 +376,65 @@ export function DoctorPatientFile({ onNavigate }: Props) {
                         <div className="flex-1">
                           <h4 className="text-gray-900 mb-2">Diagnostic IA suggéré</h4>
                           <p className="text-gray-700 mb-3">
-                            Pneumonie atypique avec forte probabilité basée sur l'analyse combinée 
-                            des symptômes décrits (toux sèche persistante, fièvre), des marqueurs inflammatoires 
-                            élevés (CRP 38 mg/L), et du pattern vocal indiquant un essoufflement modéré.
+                            {aiReport?.summary || 'Aucun résumé disponible'}
                           </p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                          <div className="text-2xl text-blue-600 mb-1">71%</div>
-                          <div className="text-sm text-gray-600">Confiance globale</div>
+                      {aiReport && (
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="text-center">
+                            <div className="text-2xl text-blue-600 mb-1">{aiReport.overall_confidence || 0}%</div>
+                            <div className="text-sm text-gray-600">Confiance globale</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl text-green-600 mb-1">
+                              {[preAnalysis?.text_input, preAnalysis?.voice_transcript, preAnalysis?.image_urls?.length].filter(Boolean).length}
+                            </div>
+                            <div className="text-sm text-gray-600">Sources de données</div>
+                          </div>
+                          <div className="text-center">
+                            <div className={`text-2xl mb-1 ${
+                              aiReport.overall_severity === 'high' ? 'text-red-600' :
+                              aiReport.overall_severity === 'medium' ? 'text-yellow-600' :
+                              'text-green-600'
+                            }`}>
+                              {aiReport.overall_severity === 'high' ? 'Élevé' :
+                               aiReport.overall_severity === 'medium' ? 'Modéré' :
+                               'Faible'}
+                            </div>
+                            <div className="text-sm text-gray-600">Niveau de gravité</div>
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <div className="text-2xl text-green-600 mb-1">3</div>
-                          <div className="text-sm text-gray-600">Sources de données</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl text-yellow-600 mb-1">Modéré</div>
-                          <div className="text-sm text-gray-600">Niveau de gravité</div>
-                        </div>
-                      </div>
+                      )}
                     </Card>
                   </div>
 
                   <div>
                     <h3 className="text-gray-900 mb-4">Hypothèses diagnostiques</h3>
+
                     <div className="space-y-3">
-                      {[
-                        { name: 'Pneumonie atypique', confidence: 71, severity: 'medium' },
-                        { name: 'Bronchite aiguë', confidence: 18, severity: 'low' },
-                        { name: 'COVID-19', confidence: 11, severity: 'medium' }
-                      ].map((diagnosis, i) => (
-                        <Card key={i} className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-gray-900">{diagnosis.name}</h4>
-                            <span className="text-blue-600">{diagnosis.confidence}%</span>
-                          </div>
-                          <Progress value={diagnosis.confidence} />
-                        </Card>
-                      ))}
+                      {hypotheses.length > 0 ? (
+
+                        hypotheses.map((hypothesis, i) => (
+                          <Card key={i} className="p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="text-gray-900">{hypothesis.disease_name}</h4>
+                              <span className="text-blue-600">{hypothesis.confidence}%</span>
+                            </div>
+
+                            {/* Correction ici */}
+                            <Progress value={hypothesis.confidence} />
+                          </Card>
+                        ))
+
+                      ) : (
+                        <p className="text-gray-500 text-sm">
+                          Aucune hypothèse diagnostique disponible.
+                        </p>
+                      )}
                     </div>
                   </div>
+
                 </TabsContent>
 
                 <TabsContent value="anamnesis" className="space-y-6">

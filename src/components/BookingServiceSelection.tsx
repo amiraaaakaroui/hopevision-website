@@ -3,12 +3,62 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Screen } from '../App';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import type { AIReport } from '../types/database';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
 export function BookingServiceSelection({ onNavigate }: Props) {
+  const [aiReport, setAiReport] = useState<AIReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [patientName, setPatientName] = useState<string>('');
+
+  useEffect(() => {
+    loadBookingContext();
+  }, []);
+
+  const loadBookingContext = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer le pre_analysis_id depuis sessionStorage
+      const preAnalysisId = sessionStorage.getItem('currentPreAnalysisId');
+      
+      if (preAnalysisId) {
+        // Charger le rapport IA correspondant
+        const { data: reportData, error: reportError } = await supabase
+          .from('ai_reports')
+          .select('*')
+          .eq('pre_analysis_id', preAnalysisId)
+          .maybeSingle();
+
+        if (!reportError && reportData) {
+          setAiReport(reportData as AIReport);
+        }
+
+        // Charger le nom du patient depuis le profil
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (profileData?.full_name) {
+            setPatientName(profileData.full_name);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[BookingServiceSelection] Error loading context:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   const services = [
     {
       id: 'teleconsult',
@@ -62,15 +112,23 @@ export function BookingServiceSelection({ onNavigate }: Props) {
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => onNavigate('doctor-detailed-report')}
+                onClick={() => {
+                  // Retourner au rapport détaillé patient ou au dashboard
+                  const preAnalysisId = sessionStorage.getItem('currentPreAnalysisId');
+                  if (preAnalysisId) {
+                    onNavigate('patient-detailed-report');
+                  } else {
+                    onNavigate('patient-dashboard');
+                  }
+                }}
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Retour au rapport
+                Retour
               </Button>
               <div className="w-1 h-8 bg-gray-200"></div>
               <div>
                 <h1 className="text-gray-900">Réserver une prestation</h1>
-                <p className="text-xs text-gray-500">Pour Nadia Ben Salem</p>
+                <p className="text-xs text-gray-500">{patientName || 'Patient'}</p>
               </div>
             </div>
           </div>
@@ -119,13 +177,26 @@ export function BookingServiceSelection({ onNavigate }: Props) {
             </div>
             <div className="flex-1">
               <h3 className="text-gray-900 mb-2">Contexte médical</h3>
-              <p className="text-sm text-gray-700 mb-3">
-                Diagnostic: <strong>Pneumonie atypique</strong> • Confiance: <strong>78%</strong>
-              </p>
-              <p className="text-sm text-gray-700">
-                Le rapport médical complet sera partagé avec le prestataire choisi pour 
-                assurer une continuité des soins optimale.
-              </p>
+              {loading ? (
+                <p className="text-sm text-gray-700 mb-3">Chargement...</p>
+              ) : aiReport ? (
+                <>
+                  <p className="text-sm text-gray-700 mb-3">
+                    Diagnostic: <strong>{aiReport.primary_diagnosis || 'En cours d\'analyse'}</strong>
+                    {aiReport.overall_confidence && (
+                      <> • Confiance: <strong>{Math.round(aiReport.overall_confidence)}%</strong></>
+                    )}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    Le rapport médical complet sera partagé avec le prestataire choisi pour 
+                    assurer une continuité des soins optimale.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-gray-700 mb-3">
+                  Aucun rapport médical disponible. Vous pouvez toujours réserver une consultation.
+                </p>
+              )}
             </div>
           </div>
         </Card>
@@ -172,7 +243,12 @@ export function BookingServiceSelection({ onNavigate }: Props) {
                     : ''
                 }`}
                 variant={service.recommended ? 'default' : 'outline'}
-                onClick={() => onNavigate('booking-provider-selection')}
+                onClick={() => {
+                  // Sauvegarder le service sélectionné dans sessionStorage
+                  sessionStorage.setItem('selectedServiceType', service.id);
+                  sessionStorage.setItem('selectedServiceName', service.title);
+                  onNavigate('booking-provider-selection');
+                }}
               >
                 Sélectionner
               </Button>

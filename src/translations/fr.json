@@ -1,0 +1,345 @@
+{
+  "common": {
+    "language": "Langue",
+    "french": "Français",
+    "english": "Anglais"
+  },
+  "calendly": {
+    "title": "Réserver une démo",
+    "close": "Fermer",
+    "loading": "Chargement du calendrier..."
+  },
+  "waitlist": {
+    "close": "Fermer la modale",
+    "title": "Accès Beta Privé",
+    "subtitle": "Rejoignez les <span class=\"font-semibold text-slate-700\">1,240+ testeurs</span> pionniers.",
+    "roleLabel": "Je suis...",
+    "roles": {
+      "patient": "Patient",
+      "doctor": "Médecin",
+      "hospital": "Hôpital"
+    },
+    "fullName": "Nom complet",
+    "fullNamePlaceholder": "Jean Dupont",
+    "specialty": "Spécialité",
+    "specialtyPlaceholder": "Ex: Cardiologie, Généraliste...",
+    "institutionName": "Nom de l'établissement",
+    "institutionPlaceholder": "Ex: Clinique du Parc",
+    "email": "Email",
+    "emailPlaceholder": "nom@exemple.com",
+    "emailError": "Veuillez entrer une adresse email valide.",
+    "phone": "Téléphone",
+    "phonePlaceholder": "06 12 34 56 78",
+    "optional": "Optionnel",
+    "submit": "Rejoindre la liste",
+    "errors": {
+      "duplicateEmail": "Cet email est déjà inscrit sur la liste d'attente.",
+      "networkError": "Erreur de connexion. Vérifiez votre connexion internet et réessayez.",
+      "generic": "Une erreur est survenue. Veuillez réessayer plus tard."
+    },
+    "success": {
+      "patient": {
+        "title": "Bienvenue {{name}} !",
+        "message": "Vous êtes maintenant inscrit sur la liste d'attente Beta. Nous vous contacterons bientôt à {{email}}."
+      },
+      "professional": {
+        "title": "Demande reçue",
+        "message": "Merci {{name}}. Le module Pro est en test. Voulez-vous un aperçu ?",
+        "demoButton": "Planifier une démo (15 min)",
+        "skip": "Non merci"
+      },
+      "back": "Retourner à l'accueil"
+    }
+  },
+  "landing": {
+    "nav": {
+      "solution": "Solution",
+      "demo": "Démonstration",
+      "architecture": "Architecture",
+      "testimonials": "Témoignages",
+      "faq": "FAQ"
+    },
+    "header": {
+      "logoAlt": "HopeVisionAI Logo"
+    },
+    "hero": {
+      "newVersion": "Nouvelle version 2.0 disponible",
+      "betaBadge": "BETA",
+      "title": "L'intelligence médicale",
+      "titleHighlight": "augmentée et explicable",
+      "subtitle": "HopeVisionAI fusionne voix, image et données cliniques pour offrir aux médecins un diagnostic assisté transparent et aux patients une orientation immédiate.",
+      "cta": {
+        "primary": "Essayer la Beta (Gratuit)",
+        "secondary": "Réserver une démo",
+        "expectations": "Accès immédiat pour les patients. Médecins & Hôpitaux : demandez votre accès exclusif à la beta privée."
+      },
+      "institutionLink": "Vous représentez une institution ?",
+      "emailConfirmed": {
+        "title": "Votre adresse e-mail a été confirmée avec succès !",
+        "doctor": "Vous pouvez maintenant vous connecter pour compléter votre profil médecin et accéder à votre espace professionnel.",
+        "patient": "Vous pouvez maintenant vous connecter pour compléter votre profil patient et accéder à votre espace.",
+        "button": "Se connecter →"
+      }
+    },
+    "trust": {
+      "title": "CONÇUE POUR LA CONFIANCE CLINIQUE",
+      "items": {
+        "security": "Sécurité des données",
+        "rgpd": "Confidentialité & RGPD",
+        "hl7": "Standards HL7 / FHIR",
+        "explainable": "IA explicable",
+        "audit": "Traçabilité & audit"
+      }
+    },
+    "stats": {
+      "diagnostics": "Diagnostics assistés",
+      "timeSaved": "Temps médical gagné",
+      "accuracy": "Précision IA (Validée)",
+      "partners": "Partenaires Hospitaliers",
+      "doctors": "médecins consultés"
+    },
+    "solution": {
+      "problem": "La Problématique",
+      "title": "La médecine moderne face au mur des données",
+      "description": "Entre l'explosion des résultats d'imagerie, les comptes rendus textuels et la surcharge administrative, les médecins passent <strong>50% de leur temps</strong> loin du patient.",
+      "points": {
+        "multimodal": "Centralisation de toutes les données (Multimodal)",
+        "transparent": "Aide à la décision transparente (Box Blanche)",
+        "time": "Gain de temps administratif immédiat"
+      },
+      "multimodal": {
+        "processing": "Processing...",
+        "voice": "Voix",
+        "voiceSub": "Analyse Sémantique",
+        "imaging": "Imagerie",
+        "imagingSub": "Vision par Ordinateur",
+        "text": "Texte",
+        "textSub": "NLP Médical",
+        "signals": "Signaux",
+        "signalsSub": "IoT & Constantes"
+      }
+    },
+    "scenarios": {
+      "title": "Une plateforme, deux visions unifiées",
+      "subtitle": "Choisissez votre profil pour découvrir l'expérience adaptée.",
+      "doctor": "Espace Médecin",
+      "patient": "Espace Patient",
+      "workflow": {
+        "tag": "Workflow Clinique",
+        "title": "Du diagnostic à la décision, sans friction.",
+        "description": "Suivez le parcours réel d'un médecin sur HopeVisionAI : importez les données, laissez l'IA pré-analyser, collaborez avec vos pairs et générez vos rapports en un clic.",
+        "steps": {
+          "centralization": {
+            "title": "Centralisation",
+            "text": "Images, biologie et notes réunies."
+          },
+          "analysis": {
+            "title": "Analyse IA",
+            "text": "Fusion multimodale et hypothèses."
+          },
+          "collaboration": {
+            "title": "Collaboration",
+            "text": "Avis spécialiste instantané."
+          },
+          "report": {
+            "title": "Rapport",
+            "text": "Génération automatique et sécurisée."
+          }
+        },
+        "restart": "Recommencer démo"
+      },
+      "patientDemo": {
+        "tag": "Démo Interactive",
+        "title": "Essayez le parcours patient",
+        "description": "Cliquez sur l'interface téléphone pour vivre l'expérience HopeVisionAI : de l'analyse multimodale à la réservation, guidé par l'IA.",
+        "features": {
+          "multimodal": {
+            "title": "1. Multimodalité",
+            "text": "Le patient s'exprime librement (voix, image, texte)."
+          },
+          "reasoning": {
+            "title": "2. Raisonnement IA",
+            "text": "Questions de précision dynamiques pour affiner le pré-diagnostic."
+          },
+          "orientation": {
+            "title": "3. Orientation",
+            "text": "Réservation directe avec le spécialiste le plus pertinent."
+          }
+        },
+        "restart": "Recommencer la démo"
+      },
+      "doctorDemo": {
+        "title": "HopeVisionAI | Médecin",
+        "dashboard": "Tableau de Bord",
+        "pending": "En attente",
+        "urgent": "Urgents",
+        "avgTime": "Tps Moyen",
+        "queue": "File d'attente",
+        "backToList": "Retour liste",
+        "patient": {
+          "name": "Jean Dupont",
+          "info": "Homme, 54 ans • Motif: Dyspnée persistante"
+        },
+        "import": {
+          "title": "Importer des données",
+          "subtitle": "Glisser-déposer IRM, PDF, Audio...",
+          "security": "Sécurisation & Import...",
+          "encryption": "Chiffrement AES-256 en cours"
+        },
+        "analysis": {
+          "vision": "Vision (IRM)",
+          "nlp": "NLP (Texte)",
+          "analyzing": "Analyse...",
+          "extracting": "Extraction...",
+          "results": "Résultats de l'analyse",
+          "diagnosis": "Pneumonie Atypique",
+          "confidence": "94% IA"
+        }
+      }
+    },
+    "tech": {
+      "tag": "Infrastructure",
+      "title": "Architecture",
+      "titleHighlight": "de pointe",
+      "subtitle": "Conçue pour la performance, la sécurité et l'éthique médicale stricte.",
+      "cards": {
+        "knowledgeGraph": {
+          "title": "Clinical Knowledge Graph",
+          "text": "Réseau sémantique reliant symptômes et maladies pour un raisonnement clinique proche de l'humain."
+        },
+        "security": {
+          "title": "Sécurité & HDS",
+          "text": "Chiffrement de bout en bout. Données hébergées sur serveurs certifiés HDS, conformité RGPD totale."
+        },
+        "interoperability": {
+          "title": "Interopérabilité (FHIR)",
+          "text": "Intégration fluide avec les systèmes hospitaliers existants (HL7), les laboratoires et les DMP."
+        },
+        "explainable": {
+          "title": "IA Explicable",
+          "text": "Pas de boîte noire. Chaque décision est justifiée par des preuves cliniques transparentes."
+        },
+        "learning": {
+          "title": "Learning Loop",
+          "text": "Le modèle s'améliore continuellement grâce aux validations (feedback) des médecins experts."
+        },
+        "digitalTwin": {
+          "title": "Jumeau Numérique",
+          "text": "Simulation d'évolution de l'état de santé pour une médecine prédictive et personnalisée."
+        }
+      }
+    },
+    "testimonials": {
+      "title": "Ils utilisent HopeVisionAI au quotidien",
+      "subtitle": "Retours d'expérience de notre communauté médicale et patientèle.",
+      "items": [
+        {
+          "quote": "Le tri automatique des cas selon l'urgence et l'analyse combinant texte, voix et images représentent exactement le type de solution dont nous avons besoin pour gagner du temps et de la précision. C'est un très beau travail.",
+          "name": "Dr Emira S.",
+          "title": "Médecin de famille"
+        },
+        {
+          "quote": "Grâce à HopeVisionAI, j'ai pu comprendre rapidement la gravité de mes symptômes et me rendre aux urgences à temps. J'ai été prise en charge et hospitalisée. Pendant six mois, j'ai utilisé HopeVisionAI pour suivre l'évolution de mon état de santé, analyser mes symptômes et mieux organiser mes documents médicaux. Ce système m'a été d'une aide précieuse et je suis convaincue qu'il a contribué à préserver ma santé",
+          "name": "Amira K.",
+          "title": "Patiente"
+        },
+        {
+          "quote": "HopeVisionAI apporte une réponse concrète à la surcharge cognitive de nos équipes. La capacité de la plateforme à analyser simultanément texte, voix et images permettrait de structurer rapidement les dossiers patients et de mieux organiser le flux en urgence.",
+          "name": "Médecin urgentiste",
+          "title": "Hôpital Mongi Slim"
+        }
+      ]
+    },
+    "cta": {
+      "title": "Rejoignez la révolution médicale",
+      "subtitle": "Découvrez comment HopeVisionAI peut réduire vos tâches administratives de 30% dès le premier mois.",
+      "emailPlaceholder": "Votre email professionnel...",
+      "button": "Commencer",
+      "noCard": "Pas de carte requise",
+      "hdsInstall": "Installation HDS"
+    },
+    "faq": {
+      "title": "Questions Fréquentes",
+      "subtitle": "Tout ce que vous devez savoir sur l'intégration de HopeVisionAI.",
+      "items": [
+        {
+          "question": "Comment sont protégées les données de santé ?",
+          "answer": "La sécurité est notre priorité absolue. Toutes les données sont chiffrées de bout en bout et hébergées sur des serveurs certifiés HDS (Hébergeur de Données de Santé) en France, en stricte conformité avec le RGPD."
+        },
+        {
+          "question": "HopeVisionAI s'intègre-t-il à mon logiciel médical actuel ?",
+          "answer": "Oui. Grâce à notre API compatible FHIR et HL7, HopeVisionAI s'interface avec la majorité des DPI (Dossiers Patients Informatisés) et logiciels de gestion de cabinet du marché sans perturber vos habitudes."
+        },
+        {
+          "question": "L'IA remplace-t-elle le diagnostic du médecin ?",
+          "answer": "Absolument pas. HopeVisionAI est un outil d'aide à la décision (CDSS). Il propose des analyses et hiérarchise les risques, mais la validation clinique et la décision finale appartiennent toujours au praticien."
+        },
+        {
+          "question": "Quelle est la précision des modèles d'analyse d'image ?",
+          "answer": "Nos modèles atteignent une sensibilité de 98.5% sur les pathologies standards (validé par étude clinique). Le système apprend en continu grâce à la boucle de rétroaction des experts médicaux."
+        }
+      ]
+    },
+    "footer": {
+      "tagline": "L'IA médicale éthique et explicable.",
+      "product": "Produit",
+      "productLinks": {
+        "doctors": "Pour Médecins",
+        "patients": "Pour Patients"
+      },
+      "company": "Société",
+      "companyLinks": {
+        "about": "À propos",
+        "contact": "Contact"
+      },
+      "legal": "Légal",
+      "legalLinks": {
+        "privacy": "Confidentialité",
+        "hds": "HDS"
+      },
+      "copyright": "© 2024 HopeVisionAI.",
+      "operational": "Opérationnel"
+    },
+    "b2b": {
+      "tag": "Solutions Entreprise & Écosystème",
+      "title": "Transformez vos données en levier de",
+      "titleHighlight": "performance et de prévention",
+      "subtitle": "Des solutions sur-mesure conçues pour réduire les risques, optimiser les coûts et accélérer la recherche médicale.",
+      "hospitals": {
+        "title": "Hôpitaux & Cliniques",
+        "subtitle": "Performance Opérationnelle",
+        "points": {
+          "time": "Réduisez de 30% le temps administratif des médecins.",
+          "security": "Sécurisez les diagnostics et réduisez les risques d'erreurs.",
+          "flow": "Fluidifiez le flux patient aux urgences grâce au tri IA."
+        },
+        "cta": "Demander un audit clinique"
+      },
+      "insurers": {
+        "title": "Assureurs & Mutuelles",
+        "subtitle": "Maîtrise du Risque",
+        "points": {
+          "care": "<strong class=\"text-slate-900\">Le juste soin</strong> : Orientez l'assuré vers le bon spécialiste.",
+          "prevention": "Services de <strong class=\"text-slate-900\">prévention proactive</strong> pour réduire la sinistralité.",
+          "data": "Données de <strong class=\"text-slate-900\">santé populationnelle</strong> en temps réel."
+        },
+        "cta": "Simuler vos économies"
+      },
+      "labs": {
+        "title": "Laboratoires & Pharma",
+        "subtitle": "R&D & Innovation Data",
+        "points": {
+          "data": "Accédez à des <strong class=\"text-slate-900\">données structurées</strong> et anonymisées.",
+          "cohorts": "Identifiez des <strong class=\"text-slate-900\">cohortes qualifiées</strong> pour vos essais cliniques.",
+          "rwe": "Valorisez l'efficacité des traitements en <strong class=\"text-slate-900\">vie réelle (RWE)</strong>."
+        },
+        "cta": "Accéder au Data Hub"
+      },
+      "cta": {
+        "title": "Besoin d'une intégration spécifique ?",
+        "description": "Nos équipes déploient HopeVisionAI sur site ou en cloud souverain HDS. Intégration API standardisée et conformité RGPD native.",
+        "button": "Parler à un expert Solution"
+      }
+    }
+  }
+}

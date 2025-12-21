@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Stethoscope, Activity, Brain, ShieldCheck, Users, FileText, Mic, ImageIcon, Menu, X, Network, Lock, HeartPulse, ArrowRight, Star, Smartphone, ChevronDown, ChevronUp, ChevronRight, Clock, Check, Send, Camera, Paperclip, Calendar, Video, MapPin, RefreshCw, Plus, BarChart, ClipboardCheck, UserPlus, MessageSquare, ClipboardList, Upload, Droplet, Scan, FlaskConical, MessageCircle, AlertCircle, FileBarChart, Search, MoreVertical, Eye, EyeOff, Building2, CheckCircle2, BriefcaseMedical
+  Stethoscope, Activity, Brain, ShieldCheck, Users, FileText, Mic, ImageIcon, Menu, X, Network, Lock, HeartPulse, ArrowRight, Star, Smartphone, ChevronDown, ChevronUp, ChevronRight, Clock, Check, Send, Camera, Paperclip, Calendar, Video, MapPin, RefreshCw, ClipboardList, Upload, Scan, FlaskConical, MessageCircle, AlertCircle, Search, MoreVertical, Eye, EyeOff, Building2, CheckCircle2, BriefcaseMedical
 } from 'lucide-react';
 import { Screen } from '../App';
+import { useLanguage } from '../contexts/LanguageContext';
+import { LanguageSelector } from './LanguageSelector';
+import { BetaWaitlistModal } from './BetaWaitlistModal';
+import { CalendlyModal } from './CalendlyModal';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
@@ -28,7 +32,7 @@ const useScrollReveal = () => {
 };
 
 // --- COMPOSANT ANIMATED COUNTER ---
-const AnimatedCounter = ({ end, duration = 2000, suffix = "" }: { end: string | number, duration?: number, suffix?: string }) => {
+const AnimatedCounter = ({ end, suffix = "", prefix = "" }: { end: string | number, suffix?: string, prefix?: string }) => {
   const [count, setCount] = useState(0);
   const domRef = useRef<HTMLSpanElement>(null);
 
@@ -63,7 +67,7 @@ const AnimatedCounter = ({ end, duration = 2000, suffix = "" }: { end: string | 
     };
   }, [end]);
 
-  return <span ref={domRef}>{count}{suffix}</span>;
+  return <span ref={domRef}>{prefix}{count}{suffix}</span>;
 };
 
 const RevealSection = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: React.CSSProperties }) => {
@@ -154,9 +158,27 @@ const FAQItem = ({ question, answer }: { question: string, answer: string }) => 
 };
 
 export function Landing({ onNavigate }: Props) {
+  const { t } = useLanguage();
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+  const [showCalendlyModal, setShowCalendlyModal] = useState(false);
+  // Check if user just confirmed email
+  const [emailConfirmed, setEmailConfirmed] = useState(false);
+  const [emailConfirmedRole, setEmailConfirmedRole] = useState<'patient' | 'doctor' | null>(null);
+
+  useEffect(() => {
+    // Check if email was just confirmed
+    const confirmed = sessionStorage.getItem('email-confirmed');
+    const role = sessionStorage.getItem('email-confirmed-role') as 'patient' | 'doctor' | null;
+    if (confirmed === 'true') {
+      setEmailConfirmed(true);
+      setEmailConfirmedRole(role);
+      // Clear the flags after showing message
+      sessionStorage.removeItem('email-confirmed');
+      sessionStorage.removeItem('email-confirmed-role');
+    }
+  }, []);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeScenario, setActiveScenario] = useState<'doctor' | 'patient'>('doctor');
-  const [email, setEmail] = useState("");
 
   // --- PATIENT DEMO STATE ---
   const [patientDemoStep, setPatientDemoStep] = useState(0);
@@ -279,11 +301,11 @@ export function Landing({ onNavigate }: Props) {
 
   // Navigation Links
   const navLinks = [
-    { name: 'Solution', href: '#solution' },
-    { name: 'Démonstration', href: '#scenarios' },
-    { name: 'Architecture', href: '#tech' },
-    { name: 'Témoignages', href: '#testimonials' },
-    { name: 'FAQ', href: '#faq' },
+    { name: t('landing.nav.solution'), href: '#solution' },
+    { name: t('landing.nav.demo'), href: '#scenarios' },
+    { name: t('landing.nav.architecture'), href: '#tech' },
+    { name: t('landing.nav.testimonials'), href: '#testimonials' },
+    { name: t('landing.nav.faq'), href: '#faq' },
   ];
 
   return (
@@ -294,27 +316,24 @@ export function Landing({ onNavigate }: Props) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-              <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-200">
-                <Brain className="h-6 w-6 text-white" />
-              </div>
+              <img src="/iconlogo.png" alt={t('landing.header.logoAlt')} className="h-10 w-10 object-contain rounded-lg" />
               <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-cyan-500">
                 HopeVisionAI
               </span>
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-blue-200">
+                {t('landing.hero.betaBadge')}
+              </span>
             </div>
-            <nav className="hidden md:flex space-x-8">
+            <nav className="hidden md:flex space-x-8 items-center">
               {navLinks.map((link) => (
                 <a key={link.name} href={link.href} className="text-slate-600 hover:text-blue-600 font-medium transition-colors text-sm uppercase tracking-wide">
                   {link.name}
                 </a>
               ))}
+              <LanguageSelector />
             </nav>
-            <div className="hidden md:flex items-center gap-4">
-              <button onClick={() => onNavigate('doctor-login')} className="text-blue-600 font-semibold hover:text-blue-700 text-sm">Se connecter</button>
-              <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-semibold transition-all shadow-lg shadow-blue-200 hover:shadow-blue-300 transform hover:-translate-y-0.5">
-                S'inscrire
-              </button>
-            </div>
-            <div className="md:hidden">
+            <div className="md:hidden flex items-center gap-2">
+              <LanguageSelector />
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-600 p-2 rounded-md hover:bg-slate-100">
                 {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
               </button>
@@ -330,9 +349,21 @@ export function Landing({ onNavigate }: Props) {
                   {link.name}
                 </a>
               ))}
+              <div className="pt-4 border-t border-slate-200">
+                <div className="px-4 py-2">
+                  <LanguageSelector />
+                </div>
+              </div>
               <div className="pt-6 flex flex-col gap-3">
-                <button onClick={() => onNavigate('doctor-login')} className="w-full text-center text-blue-600 font-semibold border border-blue-200 py-3 rounded-xl">Se connecter</button>
-                <button className="w-full text-center bg-blue-600 text-white py-3 rounded-xl font-semibold shadow-md">S'inscrire</button>
+                <button onClick={() => onNavigate('doctor-login')} className="w-full text-center text-blue-600 font-semibold border border-blue-200 py-3 rounded-xl">{t('landing.hero.emailConfirmed.button').replace(' →', '')}</button>
+                <a 
+                  href="https://tally.so/r/w8qXQN" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-full text-center bg-blue-600 text-white py-3 rounded-xl font-semibold shadow-md hover:bg-blue-700 transition-colors"
+                >
+                  {t('landing.hero.cta.primary')}
+                </a>
               </div>
             </div>
           </div>
@@ -345,28 +376,69 @@ export function Landing({ onNavigate }: Props) {
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-[30rem] h-[30rem] rounded-full bg-blue-100/50 blur-3xl opacity-60"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center max-w-5xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-blue-100 shadow-sm text-blue-700 font-semibold text-xs uppercase tracking-wider mb-8 animate-bounce-slow cursor-default">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 border border-blue-200 shadow-sm text-blue-700 font-bold text-xs uppercase tracking-wider mb-4 animate-pulse cursor-default">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
               </span>
-              Nouvelle version 2.0 disponible
+              {t('landing.hero.betaBadge')} - {t('landing.hero.newVersion')}
             </div>
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 mb-8 leading-[1.1]">
-              L'intelligence médicale <br className="hidden md:block" />
+              {t('landing.hero.title')} <br className="hidden md:block" />
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600">
-                augmentée et explicable
+                {t('landing.hero.titleHighlight')}
               </span>
             </h1>
             <p className="text-xl text-slate-600 mb-12 leading-relaxed max-w-3xl mx-auto">
-              HopeVisionAI fusionne voix, image et données cliniques pour offrir aux médecins un diagnostic assisté transparent et aux patients une orientation immédiate.
+              {t('landing.hero.subtitle')}
             </p>
+            
+            {/* Email Confirmation Message */}
+            {emailConfirmed && (
+              <div className="mb-8 max-w-2xl mx-auto animate-fade-in">
+                <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 shadow-lg">
+                  <div className="flex items-start gap-4">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="text-green-900 font-bold mb-2">Votre adresse e-mail a été confirmée avec succès !</h3>
+                      <p className="text-green-700 text-sm mb-4">
+                        {emailConfirmedRole === 'doctor' 
+                          ? "Vous pouvez maintenant vous connecter pour compléter votre profil médecin et accéder à votre espace professionnel."
+                          : "Vous pouvez maintenant vous connecter pour compléter votre profil patient et accéder à votre espace."
+                        }
+                      </p>
+                      <button 
+                        onClick={() => onNavigate(emailConfirmedRole === 'doctor' ? 'auth-login-doctor' : 'auth-login-patient')} 
+                        className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-semibold text-sm shadow-md transition-all transform hover:-translate-y-0.5"
+                      >
+                        Se connecter →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="flex flex-col items-center gap-4">
-              <button onClick={() => onNavigate('role-selection')} className="px-8 py-4 bg-blue-600 text-white rounded-full font-bold text-lg shadow-xl hover:bg-blue-700 transition-all hover:-translate-y-1">
-                Démarrer l'expérience
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                <button 
+                  onClick={() => setShowWaitlistModal(true)}
+                  className="px-8 py-4 bg-blue-600 text-white rounded-full font-bold text-lg shadow-xl hover:bg-blue-700 transition-all hover:-translate-y-1 text-center w-full sm:w-auto"
+                >
+                  {t('landing.hero.cta.primary')}
               </button>
+                <button 
+                  onClick={() => setShowCalendlyModal(true)}
+                  className="px-8 py-4 border-2 border-blue-600 text-blue-600 rounded-full font-bold text-lg hover:bg-blue-50 transition-all hover:-translate-y-1 text-center w-full sm:w-auto"
+                >
+                  {t('landing.hero.cta.secondary')}
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 max-w-md text-center mt-2">
+                {t('landing.hero.cta.expectations')}
+              </p>
               <a href="#b2b-section" className="text-sm text-slate-500 hover:text-blue-600 underline decoration-slate-300 underline-offset-4">
-                Vous représentez une institution ?
+                {t('landing.hero.institutionLink')}
               </a>
             </div>
           </div>
@@ -377,14 +449,13 @@ export function Landing({ onNavigate }: Props) {
       <RevealSection className="py-10 bg-slate-50 border-y border-slate-100">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-8">
-            Technologie certifiée et adoptée par
+            {t('landing.trust.title')}
           </p>
           <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500">
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-xl"><ShieldCheck className="w-6 h-6 text-blue-600" /> SantéSecure<span className="text-xs align-top text-blue-600">HDS</span></div>
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-xl"><Activity className="w-6 h-6 text-red-500" /> CHU Référence</div>
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-xl"><Network className="w-6 h-6 text-purple-600" /> MedTech Lab</div>
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-xl"><Lock className="w-6 h-6 text-green-600" /> RGPD Compliant</div>
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-xl"><Brain className="w-6 h-6 text-cyan-600" /> NeuroAI Institute</div>
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-xl"><ShieldCheck className="w-6 h-6 text-blue-600" /> {t('landing.trust.items.security')}</div>
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-xl"><Lock className="w-6 h-6 text-green-600" /> {t('landing.trust.items.rgpd')}</div>
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-xl"><Network className="w-6 h-6 text-purple-600" /> {t('landing.trust.items.hl7')}</div>
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-xl"><Brain className="w-6 h-6 text-cyan-600" /> {t('landing.trust.items.explainable')}</div>
           </div>
         </div>
       </RevealSection>
@@ -394,15 +465,15 @@ export function Landing({ onNavigate }: Props) {
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 divide-x divide-slate-100">
             {[
-              { label: "Diagnostics assistés", val: 1200, suffix: "k+", icon: Activity, color: "text-blue-600" },
-              { label: "Temps médical gagné", val: 30, suffix: "%", icon: Clock, color: "text-green-600" },
-              { label: "Précision IA (Validée)", val: 98, suffix: "%", icon: Check, color: "text-purple-600" },
-              { label: "Partenaires Hospitaliers", val: 200, suffix: "+", icon: Network, color: "text-cyan-600" },
+              { label: t('landing.stats.diagnostics'), val: 1200, suffix: "k+", icon: Activity, color: "text-blue-600" },
+              { label: t('landing.stats.timeSaved'), val: 30, suffix: "%", icon: Clock, color: "text-green-600" },
+              { label: t('landing.stats.accuracy'), val: 98, suffix: "%", icon: Check, color: "text-purple-600" },
+              { label: t('landing.stats.doctors'), val: 50, suffix: "", prefix: "+", icon: Network, color: "text-cyan-600" },
             ].map((stat, idx) => (
               <RevealSection key={idx} className="text-center p-4">
                 <stat.icon className={`w-6 h-6 mx-auto mb-2 ${stat.color}`} />
                 <div className="text-3xl font-extrabold text-slate-900 mb-1">
-                  <AnimatedCounter end={stat.val.toString()} suffix={stat.suffix} />
+                  <AnimatedCounter end={stat.val.toString()} suffix={stat.suffix} prefix={(stat as any).prefix || ""} />
                 </div>
                 <div className="text-sm text-slate-500 font-medium uppercase tracking-wide">{stat.label}</div>
               </RevealSection>
@@ -416,19 +487,17 @@ export function Landing({ onNavigate }: Props) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
             <RevealSection>
-              <div className="inline-block px-3 py-1 mb-6 bg-red-50 text-red-600 rounded-lg text-xs font-bold uppercase">La Problématique</div>
+              <div className="inline-block px-3 py-1 mb-6 bg-red-50 text-red-600 rounded-lg text-xs font-bold uppercase">{t('landing.solution.problem')}</div>
               <h2 className="text-4xl font-bold text-slate-900 mb-6 leading-tight">
-                La médecine moderne face au mur des données
+                {t('landing.solution.title')}
               </h2>
-              <p className="text-slate-600 text-lg mb-6 leading-relaxed">
-                Entre l'explosion des résultats d'imagerie, les comptes rendus textuels et la surcharge administrative, les médecins passent <strong className="text-slate-900 bg-yellow-100 px-1">50% de leur temps</strong> loin du patient.
-              </p>
+              <p className="text-slate-600 text-lg mb-6 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('landing.solution.description') }} />
 
               <div className="space-y-4 mt-8">
                 {[
-                  { text: "Centralisation de toutes les données (Multimodal)", color: "bg-blue-500" },
-                  { text: "Aide à la décision transparente (Box Blanche)", color: "bg-purple-500" },
-                  { text: "Gain de temps administratif immédiat", color: "bg-green-500" }
+                  { text: t('landing.solution.points.multimodal'), color: "bg-blue-500" },
+                  { text: t('landing.solution.points.transparent'), color: "bg-purple-500" },
+                  { text: t('landing.solution.points.time'), color: "bg-green-500" }
                 ].map((item, index) => (
                   <div key={index} className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
                     <div className={`w-2 h-2 rounded-full ${item.color} shadow-[0_0_10px_rgba(0,0,0,0.2)]`}></div>
@@ -480,18 +549,18 @@ export function Landing({ onNavigate }: Props) {
       <section id="scenarios" className="py-24 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <RevealSection className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Une plateforme, deux visions unifiées</h2>
-            <p className="text-slate-600 max-w-2xl mx-auto text-lg">Choisissez votre profil pour découvrir l'expérience adaptée.</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">{t('landing.scenarios.title')}</h2>
+            <p className="text-slate-600 max-w-2xl mx-auto text-lg">{t('landing.scenarios.subtitle')}</p>
           </RevealSection>
 
           {/* Toggle Switch */}
           <RevealSection className="flex justify-center mb-16">
             <div className="bg-white p-1.5 rounded-full inline-flex shadow-lg border border-slate-100">
               <button onClick={() => setActiveScenario('doctor')} className={`px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeScenario === 'doctor' ? 'bg-blue-600 text-white shadow-md scale-105' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
-                <Stethoscope className="w-4 h-4" /> Espace Médecin
+                <Stethoscope className="w-4 h-4" /> {t('landing.scenarios.doctor')}
               </button>
               <button onClick={() => setActiveScenario('patient')} style={activeScenario === 'patient' ? { backgroundColor: '#00B894' } : {}} className={`px-8 py-3 rounded-full text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeScenario === 'patient' ? 'text-white shadow-md scale-105' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
-                <Users className="w-4 h-4" /> Espace Patient
+                <Users className="w-4 h-4" /> {t('landing.scenarios.patient')}
               </button>
             </div>
           </RevealSection>
@@ -506,7 +575,7 @@ export function Landing({ onNavigate }: Props) {
                     <div className="bg-slate-800 text-white p-4 z-20 shadow-md flex justify-between items-center">
                       <div className="flex items-center gap-2">
                         <Brain className="w-5 h-5 text-blue-400" />
-                        <span className="font-bold text-sm tracking-wide">HopeVisionAI | Médecin</span>
+                        <span className="font-bold text-sm tracking-wide">{t('landing.scenarios.doctorDemo.title')}</span>
                       </div>
                       <button onClick={resetDoctorDemo} className="text-slate-300 hover:text-white"><RefreshCw className="w-4 h-4" /></button>
                     </div>
@@ -525,13 +594,13 @@ export function Landing({ onNavigate }: Props) {
                             <div className="bg-white p-3 rounded-lg shadow-sm border border-slate-100 text-center hover:shadow-md transition-shadow">
                               <div className="flex justify-center mb-2 text-blue-500"><ClipboardList className="w-5 h-5" /></div>
                               <span className="text-2xl font-bold text-slate-800 block">12</span>
-                              <span className="text-[10px] text-slate-500 uppercase font-bold">En attente</span>
+                              <span className="text-[10px] text-slate-500 uppercase font-bold">{t('landing.scenarios.doctorDemo.pending')}</span>
                             </div>
                             <div className="bg-white p-3 rounded-lg shadow-sm border border-red-100 text-center hover:shadow-md transition-shadow relative overflow-hidden">
                               <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-bl"></div>
                               <div className="flex justify-center mb-2 text-red-500"><AlertCircle className="w-5 h-5" /></div>
                               <span className="text-2xl font-bold text-slate-800 block">3</span>
-                              <span className="text-[10px] text-red-500 uppercase font-bold">Urgents</span>
+                              <span className="text-[10px] text-red-500 uppercase font-bold">{t('landing.scenarios.doctorDemo.urgent')}</span>
                             </div>
                             <div className="bg-white p-3 rounded-lg shadow-sm border border-slate-100 text-center hover:shadow-md transition-shadow">
                               <div className="flex justify-center mb-2 text-green-500"><Clock className="w-5 h-5" /></div>
@@ -541,7 +610,7 @@ export function Landing({ onNavigate }: Props) {
                           </div>
 
                           <div className="flex justify-between items-center mb-3">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">File d'attente</h4>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">{t('landing.scenarios.doctorDemo.queue')}</h4>
                             <div className="flex gap-2">
                               <Search className="w-4 h-4 text-slate-400" />
                               <MoreVertical className="w-4 h-4 text-slate-400" />
@@ -579,7 +648,7 @@ export function Landing({ onNavigate }: Props) {
                       {doctorDemoStep === 1 && (
                         <div className="animate-fade-in h-full flex flex-col">
                           <div className="flex items-center gap-2 text-slate-400 mb-4 text-xs cursor-pointer hover:text-slate-600" onClick={() => setDoctorDemoStep(0)}>
-                            <ArrowRight className="w-3 h-3 rotate-180" /> Retour liste
+                            <ArrowRight className="w-3 h-3 rotate-180" /> {t('landing.scenarios.doctorDemo.backToList') || 'Retour liste'}
                           </div>
                           <div className="flex justify-between items-start mb-6">
                             <div>
@@ -602,8 +671,8 @@ export function Landing({ onNavigate }: Props) {
                           {doctorIsProcessing && (
                             <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-xl">
                               <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-                              <p className="text-sm font-bold text-slate-800">Sécurisation & Import...</p>
-                              <p className="text-xs text-slate-500 font-mono mt-1">Chiffrement AES-256 en cours</p>
+                              <p className="text-sm font-bold text-slate-800">{t('landing.scenarios.doctorDemo.import.security')}</p>
+                              <p className="text-xs text-slate-500 font-mono mt-1">{t('landing.scenarios.doctorDemo.import.encryption')}</p>
                             </div>
                           )}
                         </div>
@@ -631,8 +700,8 @@ export function Landing({ onNavigate }: Props) {
                             </div>
                             <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
                               <div className="flex justify-between text-xs mb-2 font-medium text-slate-700">
-                                <span className="flex items-center gap-2"><FileText className="w-3 h-3 text-purple-500" /> NLP (Texte)</span>
-                                <span className="text-purple-600">Extraction...</span>
+                                <span className="flex items-center gap-2"><FileText className="w-3 h-3 text-purple-500" /> {t('landing.scenarios.doctorDemo.analysis.nlp')}</span>
+                                <span className="text-purple-600">{t('landing.scenarios.doctorDemo.analysis.extracting')}</span>
                               </div>
                               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-purple-500 w-[60%] animate-[shimmer_2s_infinite]"></div></div>
                             </div>
@@ -648,8 +717,8 @@ export function Landing({ onNavigate }: Props) {
                           <div className="space-y-3 mb-6">
                             <div className="bg-white p-4 rounded-lg border-l-4 border-blue-600 shadow-md cursor-pointer hover:bg-blue-50/30 transition-colors group" onClick={handleShowExplainability}>
                               <div className="flex justify-between items-start mb-2">
-                                <h4 className="font-bold text-slate-800 text-sm">Pneumonie Atypique</h4>
-                                <span className="text-[10px] font-bold text-white bg-blue-600 px-2 py-0.5 rounded-full shadow-sm shadow-blue-200">94% IA</span>
+                                <h4 className="font-bold text-slate-800 text-sm">{t('landing.scenarios.doctorDemo.analysis.diagnosis')}</h4>
+                                <span className="text-[10px] font-bold text-white bg-blue-600 px-2 py-0.5 rounded-full shadow-sm shadow-blue-200">{t('landing.scenarios.doctorDemo.analysis.confidence')}</span>
                               </div>
                               <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
                                 <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600 w-[94%]"></div>
@@ -799,21 +868,21 @@ export function Landing({ onNavigate }: Props) {
                 {/* Workflow Description */}
                 <div className="p-10 lg:p-16 flex flex-col justify-center bg-white order-1 lg:order-2">
                   <div className="inline-flex items-center gap-2 text-blue-600 mb-4 font-bold text-sm uppercase tracking-wide">
-                    <Activity className="w-4 h-4" /> Workflow Clinique
+                    <Activity className="w-4 h-4" /> {t('landing.scenarios.workflow.tag')}
                   </div>
                   <h3 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">
-                    Du diagnostic à la décision, sans friction.
+                    {t('landing.scenarios.workflow.title')}
                   </h3>
                   <p className="text-slate-600 mb-8 text-lg leading-relaxed">
-                    Suivez le parcours réel d'un médecin sur HopeVisionAI : importez les données, laissez l'IA pré-analyser, collaborez avec vos pairs et générez vos rapports en un clic.
+                    {t('landing.scenarios.workflow.description')}
                   </p>
                   <div className="space-y-6 relative">
                     <div className="absolute left-[19px] top-4 bottom-10 w-0.5 bg-slate-100"></div>
                     {[
-                      { step: 1, title: "Centralisation", text: "Images, biologie et notes réunies.", active: doctorDemoStep >= 1 },
-                      { step: 2, title: "Analyse IA", text: "Fusion multimodale et hypothèses.", active: doctorDemoStep >= 2 },
-                      { step: 3, title: "Collaboration", text: "Avis spécialiste instantané.", active: doctorDemoStep >= 4 },
-                      { step: 4, title: "Rapport", text: "Génération automatique et sécurisée.", active: doctorDemoStep >= 6 },
+                      { step: 1, title: t('landing.scenarios.workflow.steps.centralization.title'), text: t('landing.scenarios.workflow.steps.centralization.text'), active: doctorDemoStep >= 1 },
+                      { step: 2, title: t('landing.scenarios.workflow.steps.analysis.title'), text: t('landing.scenarios.workflow.steps.analysis.text'), active: doctorDemoStep >= 2 },
+                      { step: 3, title: t('landing.scenarios.workflow.steps.collaboration.title'), text: t('landing.scenarios.workflow.steps.collaboration.text'), active: doctorDemoStep >= 4 },
+                      { step: 4, title: t('landing.scenarios.workflow.steps.report.title'), text: t('landing.scenarios.workflow.steps.report.text'), active: doctorDemoStep >= 6 },
                     ].map((item, i) => (
                       <div key={i} className={`flex items-start gap-4 relative z-10 transition-opacity duration-500 ${item.active ? 'opacity-100' : 'opacity-40'}`}>
                         <div className={`w-10 h-10 rounded-full border-4 flex items-center justify-center flex-shrink-0 font-bold text-sm transition-colors duration-500 ${item.active ? 'border-blue-100 bg-blue-600 text-white' : 'border-slate-50 bg-white text-slate-400'}`}>
@@ -869,11 +938,11 @@ export function Landing({ onNavigate }: Props) {
                   </div>
                 </div>
                 <div className="p-10 lg:p-16 flex flex-col justify-center bg-white order-1 lg:order-2">
-                  <div className="inline-flex items-center gap-2 text-teal-600 mb-4 font-bold text-sm uppercase tracking-wide"><Smartphone className="w-4 h-4" /> Démo Interactive</div>
-                  <h3 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">Essayez le parcours patient</h3>
-                  <p className="text-slate-600 mb-8 text-lg leading-relaxed">Cliquez sur l'interface téléphone pour vivre l'expérience HopeVisionAI : de l'analyse multimodale à la réservation, guidé par l'IA.</p>
+                  <div className="inline-flex items-center gap-2 text-teal-600 mb-4 font-bold text-sm uppercase tracking-wide"><Smartphone className="w-4 h-4" /> {t('landing.scenarios.patientDemo.tag')}</div>
+                  <h3 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">{t('landing.scenarios.patientDemo.title')}</h3>
+                  <p className="text-slate-600 mb-8 text-lg leading-relaxed">{t('landing.scenarios.patientDemo.description')}</p>
                   <div className="space-y-6">
-                    {[{ title: "1. Multimodalité", text: "Le patient s'exprime librement (voix, image, texte).", icon: Mic }, { title: "2. Raisonnement IA", text: "Questions de précision dynamiques pour affiner le pré-diagnostic.", icon: Brain }, { title: "3. Orientation", text: "Réservation directe avec le spécialiste le plus pertinent.", icon: Calendar }].map((feat, i) => (<div key={i} className="flex items-start gap-4 group cursor-default"><div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center flex-shrink-0 mt-1 transition-colors"><feat.icon className="w-5 h-5" /></div><div><h4 className="font-bold text-slate-900 text-lg group-hover:text-teal-600 transition-colors">{feat.title}</h4><p className="text-slate-600 text-sm">{feat.text}</p></div></div>))}
+                    {[{ title: t('landing.scenarios.patientDemo.features.multimodal.title'), text: t('landing.scenarios.patientDemo.features.multimodal.text'), icon: Mic }, { title: t('landing.scenarios.patientDemo.features.reasoning.title'), text: t('landing.scenarios.patientDemo.features.reasoning.text'), icon: Brain }, { title: t('landing.scenarios.patientDemo.features.orientation.title'), text: t('landing.scenarios.patientDemo.features.orientation.text'), icon: Calendar }].map((feat, i) => (<div key={i} className="flex items-start gap-4 group cursor-default"><div className="w-10 h-10 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center flex-shrink-0 mt-1 transition-colors"><feat.icon className="w-5 h-5" /></div><div><h4 className="font-bold text-slate-900 text-lg group-hover:text-teal-600 transition-colors">{feat.title}</h4><p className="text-slate-600 text-sm">{feat.text}</p></div></div>))}
                   </div>
                 </div>
               </div>
@@ -892,12 +961,12 @@ export function Landing({ onNavigate }: Props) {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-3">Solutions Entreprise & Écosystème</h2>
+            <h2 className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-3">{t('landing.b2b.tag')}</h2>
             <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-6">
-              Transformez vos données en levier de <br /><span className="text-blue-600">performance et de prévention</span>
+              {t('landing.b2b.title')} <br /><span className="text-blue-600">{t('landing.b2b.titleHighlight')}</span>
             </h3>
             <p className="text-lg text-slate-600">
-              Des solutions sur-mesure conçues pour réduire les risques, optimiser les coûts et accélérer la recherche médicale.
+              {t('landing.b2b.subtitle')}
             </p>
           </div>
 
@@ -916,26 +985,26 @@ export function Landing({ onNavigate }: Props) {
                 <Building2 size={28} strokeWidth={1.5} />
               </div>
 
-              <h4 className="text-xl font-bold text-slate-900">Hôpitaux & Cliniques</h4>
-              <p className="text-sm text-blue-600 font-bold mb-6 uppercase tracking-wide mt-1">Performance Opérationnelle</p>
+              <h4 className="text-xl font-bold text-slate-900">{t('landing.b2b.hospitals.title')}</h4>
+              <p className="text-sm text-blue-600 font-bold mb-6 uppercase tracking-wide mt-1">{t('landing.b2b.hospitals.subtitle')}</p>
 
               <ul className="space-y-4 mb-8 flex-grow">
                 <li className="flex items-start gap-3 text-slate-600 text-sm">
                   <CheckCircle2 size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                  <span><strong className="text-slate-900">Réduisez de 30%</strong> le temps administratif des médecins.</span>
+                  <span dangerouslySetInnerHTML={{ __html: t('landing.b2b.hospitals.points.time') }} />
                 </li>
                 <li className="flex items-start gap-3 text-slate-600 text-sm">
                   <CheckCircle2 size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                  <span><strong className="text-slate-900">Sécurisez les diagnostics</strong> et réduisez les risques d'erreurs.</span>
+                  <span dangerouslySetInnerHTML={{ __html: t('landing.b2b.hospitals.points.security') }} />
                 </li>
                 <li className="flex items-start gap-3 text-slate-600 text-sm">
                   <CheckCircle2 size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Fluidifiez le <strong className="text-slate-900">flux patient</strong> aux urgences grâce au tri IA.</span>
+                  <span dangerouslySetInnerHTML={{ __html: t('landing.b2b.hospitals.points.flow') }} />
                 </li>
               </ul>
 
               <button className="w-full py-3.5 px-4 rounded-xl border-2 border-slate-100 text-slate-700 font-bold hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50 transition-all text-sm">
-                Demander un audit clinique
+                {t('landing.b2b.hospitals.cta')}
               </button>
             </div>
 
@@ -952,26 +1021,26 @@ export function Landing({ onNavigate }: Props) {
                 <ShieldCheck size={28} strokeWidth={1.5} />
               </div>
 
-              <h4 className="text-xl font-bold text-slate-900">Assureurs & Mutuelles</h4>
-              <p className="text-sm text-purple-600 font-bold mb-6 uppercase tracking-wide mt-1">Maîtrise du Risque</p>
+              <h4 className="text-xl font-bold text-slate-900">{t('landing.b2b.insurers.title')}</h4>
+              <p className="text-sm text-purple-600 font-bold mb-6 uppercase tracking-wide mt-1">{t('landing.b2b.insurers.subtitle')}</p>
 
               <ul className="space-y-4 mb-8 flex-grow">
                 <li className="flex items-start gap-3 text-slate-600 text-sm">
                   <CheckCircle2 size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                  <span><strong className="text-slate-900">Le juste soin</strong> : Orientez l'assuré vers le bon spécialiste.</span>
+                  <span dangerouslySetInnerHTML={{ __html: t('landing.b2b.insurers.points.care') }} />
                 </li>
                 <li className="flex items-start gap-3 text-slate-600 text-sm">
                   <CheckCircle2 size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Services de <strong className="text-slate-900">prévention proactive</strong> pour réduire la sinistralité.</span>
+                  <span dangerouslySetInnerHTML={{ __html: t('landing.b2b.insurers.points.prevention') }} />
                 </li>
                 <li className="flex items-start gap-3 text-slate-600 text-sm">
                   <CheckCircle2 size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Données de <strong className="text-slate-900">santé populationnelle</strong> en temps réel.</span>
+                  <span dangerouslySetInnerHTML={{ __html: t('landing.b2b.insurers.points.data') }} />
                 </li>
               </ul>
 
               <button className="w-full py-3.5 px-4 rounded-xl border-2 border-slate-100 text-slate-700 font-bold hover:border-purple-600 hover:text-purple-600 hover:bg-purple-50 transition-all text-sm">
-                Simuler vos économies
+                {t('landing.b2b.insurers.cta')}
               </button>
             </div>
 
@@ -988,26 +1057,26 @@ export function Landing({ onNavigate }: Props) {
                 <FlaskConical size={28} strokeWidth={1.5} />
               </div>
 
-              <h4 className="text-xl font-bold text-slate-900">Laboratoires & Pharma</h4>
-              <p className="text-sm text-cyan-600 font-bold mb-6 uppercase tracking-wide mt-1">R&D & Innovation Data</p>
+              <h4 className="text-xl font-bold text-slate-900">{t('landing.b2b.labs.title')}</h4>
+              <p className="text-sm text-cyan-600 font-bold mb-6 uppercase tracking-wide mt-1">{t('landing.b2b.labs.subtitle')}</p>
 
               <ul className="space-y-4 mb-8 flex-grow">
                 <li className="flex items-start gap-3 text-slate-600 text-sm">
                   <CheckCircle2 size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Accédez à des <strong className="text-slate-900">données structurées</strong> et anonymisées.</span>
+                  <span dangerouslySetInnerHTML={{ __html: t('landing.b2b.labs.points.data') }} />
                 </li>
                 <li className="flex items-start gap-3 text-slate-600 text-sm">
                   <CheckCircle2 size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Identifiez des <strong className="text-slate-900">cohortes qualifiées</strong> pour vos essais cliniques.</span>
+                  <span dangerouslySetInnerHTML={{ __html: t('landing.b2b.labs.points.cohorts') }} />
                 </li>
                 <li className="flex items-start gap-3 text-slate-600 text-sm">
                   <CheckCircle2 size={18} className="text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Valorisez l'efficacité des traitements en <strong className="text-slate-900">vie réelle (RWE)</strong>.</span>
+                  <span dangerouslySetInnerHTML={{ __html: t('landing.b2b.labs.points.rwe') }} />
                 </li>
               </ul>
 
               <button className="w-full py-3.5 px-4 rounded-xl border-2 border-slate-100 text-slate-700 font-bold hover:border-cyan-600 hover:text-cyan-600 hover:bg-cyan-50 transition-all text-sm">
-                Accéder au Data Hub
+                {t('landing.b2b.labs.cta')}
               </button>
             </div>
 
@@ -1026,7 +1095,7 @@ export function Landing({ onNavigate }: Props) {
 
               {/* TITRE */}
               <h3 className="text-2xl md:text-3xl font-bold text-white mb-6">
-                Besoin d'une intégration spécifique ?
+                {t('landing.b2b.cta.title')}
               </h3>
 
               {/* PARAGRAPHE (Correction de couleur forcée ici) */}
@@ -1034,17 +1103,19 @@ export function Landing({ onNavigate }: Props) {
                 className="mb-10 max-w-2xl mx-auto text-base md:text-lg leading-relaxed"
                 style={{ color: '#cbd5e1' }} /* Force le gris clair (Slate-300) */
               >
-                Nos équipes déploient HopeVisionAI sur site ou en cloud souverain HDS.
-                Intégration API standardisée et conformité RGPD native.
+                {t('landing.b2b.cta.description')}
               </p>
 
               {/* BOUTON (Ajusté pour être plus large et plus beau) */}
-              <button className="group/btn inline-flex items-center gap-3 bg-white text-[#050B1E] px-8 py-4 rounded-lg font-bold text-lg shadow-lg hover:shadow-white/25 transition-all duration-300 hover:scale-105 active:scale-95">
+              <button 
+                onClick={() => setShowCalendlyModal(true)}
+                className="group/btn inline-flex items-center gap-3 bg-white text-[#050B1E] px-8 py-4 rounded-lg font-bold text-lg shadow-lg hover:shadow-white/25 transition-all duration-300 hover:scale-105 active:scale-95"
+              >
                 <BriefcaseMedical
                   size={22}
                   className="text-blue-800 transition-transform duration-300 group-hover/btn:-rotate-12"
                 />
-                <span>Parler à un expert Solution</span>
+                <span>{t('landing.b2b.cta.button')}</span>
               </button>
 
             </div>
@@ -1077,7 +1148,7 @@ export function Landing({ onNavigate }: Props) {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Header */}
-          <RevealSection className="flex flex-col md:flex-row justify-between items-end mb-12 lg:mb-16">
+          <RevealSection className="mb-12 lg:mb-16">
             <div className="max-w-3xl">
               {/* Infrastructure Tag - Better Spacing */}
               <div
@@ -1090,12 +1161,12 @@ export function Landing({ onNavigate }: Props) {
                 }}
               >
                 <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#60a5fa', boxShadow: '0 0 8px #60a5fa' }}></span>
-                Infrastructure
+                {t('landing.tech.tag')}
               </div>
 
               {/* Title - Single Line, No Box */}
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white tracking-tight leading-tight">
-                Architecture{' '}
+                {t('landing.tech.title')}{' '}
                 <span
                   style={{
                     background: 'linear-gradient(135deg, #60a5fa 0%, #22d3ee 50%, #5eead4 100%)',
@@ -1105,46 +1176,25 @@ export function Landing({ onNavigate }: Props) {
                     filter: 'drop-shadow(0 0 30px rgba(96, 165, 250, 0.3))'
                   }}
                 >
-                  de pointe
+                  {t('landing.tech.titleHighlight')}
                 </span>
               </h2>
 
               <p className="text-lg md:text-xl leading-relaxed max-w-2xl font-normal" style={{ color: '#cbd5e1', lineHeight: '1.7' }}>
-                Conçue pour la performance, la sécurité et l'éthique médicale stricte.
+                {t('landing.tech.subtitle')}
               </p>
             </div>
-
-            {/* Button with Enhanced Hover */}
-            <button
-              className="mt-8 md:mt-0 group relative px-8 lg:px-10 py-4 lg:py-5 text-white rounded-full font-bold transition-all duration-300 overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1"
-              style={{
-                backgroundColor: '#1e293b',
-                border: '1px solid rgba(255, 255, 255, 0.15)'
-              }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.backgroundColor = '#334155';
-                e.currentTarget.style.boxShadow = '0 20px 40px -10px rgba(59, 130, 246, 0.4)';
-              }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                e.currentTarget.style.backgroundColor = '#1e293b';
-                e.currentTarget.style.boxShadow = '';
-              }}
-            >
-              <span className="relative flex items-center gap-3 text-sm lg:text-base">
-                Documentation API <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </span>
-            </button>
           </RevealSection>
 
           {/* Cards Grid - Properly Spaced */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {[
-              { title: "Clinical Knowledge Graph", icon: Brain, iconColor: "#60a5fa", iconBg: "rgba(59, 130, 246, 0.12)", glowColor: "rgba(59, 130, 246, 0.4)", text: "Réseau sémantique reliant symptômes et maladies pour un raisonnement clinique proche de l'humain." },
-              { title: "Sécurité & HDS", icon: ShieldCheck, iconColor: "#34d399", iconBg: "rgba(16, 185, 129, 0.12)", glowColor: "rgba(16, 185, 129, 0.4)", text: "Chiffrement de bout en bout. Données hébergées sur serveurs certifiés HDS, conformité RGPD totale." },
-              { title: "Interopérabilité (FHIR)", icon: Network, iconColor: "#a78bfa", iconBg: "rgba(139, 92, 246, 0.12)", glowColor: "rgba(139, 92, 246, 0.4)", text: "Intégration fluide avec les systèmes hospitaliers existants (HL7), les laboratoires et les DMP." },
-              { title: "IA Explicable", icon: Lock, iconColor: "#fbbf24", iconBg: "rgba(251, 191, 36, 0.12)", glowColor: "rgba(251, 191, 36, 0.4)", text: "Pas de boîte noire. Chaque décision est justifiée par des preuves cliniques transparentes." },
-              { title: "Learning Loop", icon: HeartPulse, iconColor: "#fb7185", iconBg: "rgba(251, 113, 133, 0.12)", glowColor: "rgba(251, 113, 133, 0.4)", text: "Le modèle s'améliore continuellement grâce aux validations (feedback) des médecins experts." },
-              { title: "Jumeau Numérique", icon: Users, iconColor: "#22d3ee", iconBg: "rgba(6, 182, 212, 0.12)", glowColor: "rgba(6, 182, 212, 0.4)", text: "Simulation d'évolution de l'état de santé pour une médecine prédictive et personnalisée." }
+              { title: t('landing.tech.cards.knowledgeGraph.title'), icon: Brain, iconColor: "#60a5fa", iconBg: "rgba(59, 130, 246, 0.12)", glowColor: "rgba(59, 130, 246, 0.4)", text: t('landing.tech.cards.knowledgeGraph.text') },
+              { title: t('landing.tech.cards.security.title'), icon: ShieldCheck, iconColor: "#34d399", iconBg: "rgba(16, 185, 129, 0.12)", glowColor: "rgba(16, 185, 129, 0.4)", text: t('landing.tech.cards.security.text') },
+              { title: t('landing.tech.cards.interoperability.title'), icon: Network, iconColor: "#a78bfa", iconBg: "rgba(139, 92, 246, 0.12)", glowColor: "rgba(139, 92, 246, 0.4)", text: t('landing.tech.cards.interoperability.text') },
+              { title: t('landing.tech.cards.explainable.title'), icon: Lock, iconColor: "#fbbf24", iconBg: "rgba(251, 191, 36, 0.12)", glowColor: "rgba(251, 191, 36, 0.4)", text: t('landing.tech.cards.explainable.text') },
+              { title: t('landing.tech.cards.learning.title'), icon: HeartPulse, iconColor: "#fb7185", iconBg: "rgba(251, 113, 133, 0.12)", glowColor: "rgba(251, 113, 133, 0.4)", text: t('landing.tech.cards.learning.text') },
+              { title: t('landing.tech.cards.digitalTwin.title'), icon: Users, iconColor: "#22d3ee", iconBg: "rgba(6, 182, 212, 0.12)", glowColor: "rgba(6, 182, 212, 0.4)", text: t('landing.tech.cards.digitalTwin.text') }
             ].map((item, index) => (
               <RevealSection key={index}>
                 <div
@@ -1243,24 +1293,24 @@ export function Landing({ onNavigate }: Props) {
       <section id="testimonials" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <RevealSection className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Ils utilisent HopeVisionAI au quotidien</h2>
-            <p className="text-slate-500">Retours d'expérience de notre communauté médicale et patientèle.</p>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">{t('landing.testimonials.title')}</h2>
+            <p className="text-slate-500">{t('landing.testimonials.subtitle')}</p>
           </RevealSection>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { quote: "La fonction de pré-analyse m'a permis de détecter une urgence cardiaque chez un patient qui minimisait ses symptômes.", name: "Dr. Sophie Martin", title: "Cardiologue", color: "blue" },
-              { quote: "Je ne savais pas vers quel spécialiste me tourner. L'application m'a rassuré et m'a trouvé un RDV en 24h.", name: "Alain L.", title: "Patient", color: "teal" },
-              { quote: "L'intégration avec notre Dossier Médical a été fluide grâce à l'API FHIR. Nous avons réduit le temps administratif de 30%.", name: "Jean-Pierre D.", title: "DSI Clinique", color: "purple" }
-            ].map((t, i) => (
+              { quote: t('landing.testimonials.items.0.quote'), name: t('landing.testimonials.items.0.name'), title: t('landing.testimonials.items.0.title'), color: "blue" },
+              { quote: t('landing.testimonials.items.1.quote'), name: t('landing.testimonials.items.1.name'), title: t('landing.testimonials.items.1.title'), color: "teal" },
+              { quote: t('landing.testimonials.items.2.quote'), name: t('landing.testimonials.items.2.name'), title: t('landing.testimonials.items.2.title'), color: "purple" }
+            ].map((testimonial, i) => (
               <RevealSection key={i} className={`bg-slate-50 p-8 rounded-2xl border border-slate-100 relative hover:shadow-lg transition-shadow delay-${i * 100}`}>
                 <div className="flex text-yellow-400 mb-4 gap-1"><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /></div>
-                <p className="text-slate-700 mb-6 italic leading-relaxed">"{t.quote}"</p>
+                <p className="text-slate-700 mb-6 italic leading-relaxed">"{testimonial.quote}"</p>
                 <div className="flex items-center gap-3 border-t border-slate-200 pt-4">
-                  <div className={`w-10 h-10 rounded-full bg-${t.color}-600 flex items-center justify-center text-white font-bold text-sm`}>{t.name.charAt(0)}</div>
+                  <div className={`w-10 h-10 rounded-full bg-${testimonial.color}-600 flex items-center justify-center text-white font-bold text-sm`}>{testimonial.name.charAt(0)}</div>
                   <div>
-                    <div className="font-bold text-slate-900">{t.name}</div>
-                    <div className="text-xs text-slate-500">{t.title}</div>
+                    <div className="font-bold text-slate-900">{testimonial.name}</div>
+                    <div className="text-xs text-slate-500">{testimonial.title}</div>
                   </div>
                 </div>
               </RevealSection>
@@ -1275,28 +1325,34 @@ export function Landing({ onNavigate }: Props) {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <RevealSection>
             <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight">
-              Rejoignez la révolution médicale
+              {t('landing.cta.title')}
             </h2>
             <p className="text-blue-100 text-xl mb-10 max-w-2xl mx-auto">
-              Découvrez comment HopeVisionAI peut réduire vos tâches administratives de 30% dès le premier mois.
+              {t('landing.cta.subtitle')}
             </p>
 
-            <div className="max-w-md mx-auto bg-white/10 backdrop-blur-md p-2 rounded-full flex flex-col sm:flex-row border border-white/20 mb-8">
-              <input
-                type="email"
-                placeholder="Votre email professionnel..."
-                className="flex-1 bg-transparent text-white placeholder-blue-200 px-6 py-3 outline-none"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <button className="bg-white text-blue-600 px-8 py-3 rounded-full font-bold hover:bg-blue-50 transition-colors shadow-lg mt-2 sm:mt-0">
-                Commencer
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+              <button 
+                onClick={() => setShowWaitlistModal(true)}
+                className="px-8 py-4 bg-white text-blue-600 rounded-full font-bold text-lg hover:bg-blue-50 transition-all shadow-xl hover:-translate-y-1 text-center w-full sm:w-auto"
+              >
+                {t('landing.hero.cta.primary')}
+              </button>
+              <button 
+                onClick={() => setShowCalendlyModal(true)}
+                className="px-8 py-4 border-2 border-white text-white rounded-full font-bold text-lg hover:bg-white/10 transition-all hover:-translate-y-1 text-center w-full sm:w-auto"
+              >
+                {t('landing.hero.cta.secondary')}
               </button>
             </div>
 
-            <p className="text-blue-200 text-sm opacity-80 flex items-center justify-center gap-4">
-              <span className="flex items-center gap-1"><Check className="w-3 h-3" /> Pas de carte requise</span>
-              <span className="flex items-center gap-1"><Check className="w-3 h-3" /> Installation HDS</span>
+            <p className="text-blue-200 text-sm opacity-90 mb-4 max-w-2xl mx-auto">
+              {t('landing.hero.cta.expectations')}
+            </p>
+
+            <p className="text-blue-200 text-sm opacity-80 flex items-center justify-center gap-4 flex-wrap">
+              <span className="flex items-center gap-1"><Check className="w-3 h-3" /> {t('landing.cta.noCard')}</span>
+              <span className="flex items-center gap-1"><Check className="w-3 h-3" /> {t('landing.cta.hdsInstall')}</span>
             </p>
           </RevealSection>
         </div>
@@ -1306,25 +1362,25 @@ export function Landing({ onNavigate }: Props) {
       <section id="faq" className="py-20 bg-slate-50 border-t border-slate-200">
         <div className="max-w-3xl mx-auto px-4">
           <RevealSection className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Questions Fréquentes</h2>
-            <p className="text-slate-500">Tout ce que vous devez savoir sur l'intégration de HopeVisionAI.</p>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">{t('landing.faq.title')}</h2>
+            <p className="text-slate-500">{t('landing.faq.subtitle')}</p>
           </RevealSection>
           <div className="space-y-2">
             <FAQItem
-              question="Comment sont protégées les données de santé ?"
-              answer="La sécurité est notre priorité absolue. Toutes les données sont chiffrées de bout en bout et hébergées sur des serveurs certifiés HDS (Hébergeur de Données de Santé) en France, en stricte conformité avec le RGPD."
+              question={t('landing.faq.items.0.question')}
+              answer={t('landing.faq.items.0.answer')}
             />
             <FAQItem
-              question="HopeVisionAI s'intègre-t-il à mon logiciel médical actuel ?"
-              answer="Oui. Grâce à notre API compatible FHIR et HL7, HopeVisionAI s'interface avec la majorité des DPI (Dossiers Patients Informatisés) et logiciels de gestion de cabinet du marché sans perturber vos habitudes."
+              question={t('landing.faq.items.1.question')}
+              answer={t('landing.faq.items.1.answer')}
             />
             <FAQItem
-              question="L'IA remplace-t-elle le diagnostic du médecin ?"
-              answer="Absolument pas. HopeVisionAI est un outil d'aide à la décision (CDSS). Il propose des analyses et hiérarchise les risques, mais la validation clinique et la décision finale appartiennent toujours au praticien."
+              question={t('landing.faq.items.2.question')}
+              answer={t('landing.faq.items.2.answer')}
             />
             <FAQItem
-              question="Quelle est la précision des modèles d'analyse d'image ?"
-              answer="Nos modèles atteignent une sensibilité de 98.5% sur les pathologies standards (validé par étude clinique). Le système apprend en continu grâce à la boucle de rétroaction des experts médicaux."
+              question={t('landing.faq.items.3.question')}
+              answer={t('landing.faq.items.3.answer')}
             />
           </div>
         </div>
@@ -1339,19 +1395,38 @@ export function Landing({ onNavigate }: Props) {
                 <div className="bg-blue-600 p-1.5 rounded-lg"><Brain className="h-5 w-5 text-white" /></div>
                 <span className="text-xl font-bold text-slate-900">HopeVisionAI</span>
               </div>
-              <p className="text-slate-500 text-sm">L'IA médicale éthique et explicable.</p>
+              <p className="text-slate-500 text-sm">{t('landing.footer.tagline')}</p>
             </div>
             {/* Links simplified for brevity */}
-            <div><h4 className="font-bold mb-4">Produit</h4><ul className="text-sm text-slate-600 space-y-2"><li>Pour Médecins</li><li>Pour Patients</li></ul></div>
-            <div><h4 className="font-bold mb-4">Société</h4><ul className="text-sm text-slate-600 space-y-2"><li>À propos</li><li>Contact</li></ul></div>
-            <div><h4 className="font-bold mb-4">Légal</h4><ul className="text-sm text-slate-600 space-y-2"><li>Confidentialité</li><li>HDS</li></ul></div>
+            <div><h4 className="font-bold mb-4">{t('landing.footer.product')}</h4><ul className="text-sm text-slate-600 space-y-2"><li>{t('landing.footer.productLinks.doctors')}</li><li>{t('landing.footer.productLinks.patients')}</li></ul></div>
+            <div><h4 className="font-bold mb-4">{t('landing.footer.company')}</h4><ul className="text-sm text-slate-600 space-y-2"><li>{t('landing.footer.companyLinks.about')}</li><li>{t('landing.footer.companyLinks.contact')}</li></ul></div>
+            <div><h4 className="font-bold mb-4">{t('landing.footer.legal')}</h4><ul className="text-sm text-slate-600 space-y-2"><li>{t('landing.footer.legalLinks.privacy')}</li><li>{t('landing.footer.legalLinks.hds')}</li></ul></div>
           </div>
           <div className="border-t border-slate-200 pt-8 text-slate-400 text-sm flex justify-between items-center">
-            <p>© 2024 HopeVisionAI.</p>
-            <div className="flex items-center gap-2"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>Opérationnel</div>
+            <p>{t('landing.footer.copyright')}</p>
+            <div className="flex items-center gap-2"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>{t('landing.footer.operational')}</div>
           </div>
         </div>
       </footer>
+
+      {/* Beta Waitlist Modal */}
+      {showWaitlistModal && (
+        <BetaWaitlistModal 
+          onClose={() => setShowWaitlistModal(false)}
+          onRedirectToDemo={() => {
+            setShowWaitlistModal(false);
+            setShowCalendlyModal(true);
+          }}
+        />
+      )}
+
+      {/* Calendly Modal */}
+      {showCalendlyModal && (
+        <CalendlyModal 
+          onClose={() => setShowCalendlyModal(false)}
+          calendlyUrl="https://calendly.com/amirakaroui20/demo-hopevisionai"
+        />
+      )}
     </div>
   );
 }

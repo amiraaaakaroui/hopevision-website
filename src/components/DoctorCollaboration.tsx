@@ -6,59 +6,252 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Screen } from '../App';
+import { useEffect, useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabaseClient';
+import type { Discussion, DiscussionMessage, DiscussionParticipant, Profile, PatientProfile, DoctorProfile } from '../types/database';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
-export function DoctorCollaboration({ onNavigate }: Props) {
-  const conversations = [
-    {
-      patient: 'Nadia Ben Salem',
-      participants: ['Dr Ayari', 'Dr Mansouri'],
-      lastMessage: 'Je confirme l\'indication de radio thoracique',
-      time: 'Il y a 5 min',
-      unread: 2
-    },
-    {
-      patient: 'Ahmed Mansour',
-      participants: ['Dr Ayari', 'Dr Khalil'],
-      lastMessage: '@cardio Pouvez-vous examiner l\'ECG ?',
-      time: 'Il y a 1h',
-      unread: 0
-    }
-  ];
+interface Conversation {
+  id: string;
+  patient: string;
+  participants: string[];
+  lastMessage: string;
+  time: string;
+  unread: number;
+  discussionId: string;
+}
 
-  const messages = [
-    {
-      author: 'Dr Karim Ayari',
-      role: 'Médecine Générale',
-      message: 'Patiente de 34 ans avec toux sèche depuis 5 jours, fièvre 38.4°C, CRP élevée à 38 mg/L. L\'IA suggère une pneumonie atypique avec 71% de confiance.',
-      time: '14:20',
-      isOwn: true
-    },
-    {
-      author: 'Dr Salma Mansouri',
-      role: 'Pneumologie',
-      message: 'Merci pour le partage @ayari. Les symptômes et marqueurs sont cohérents. Je recommande une radio thoracique en urgence.',
-      time: '14:25',
-      isOwn: false
-    },
-    {
-      author: 'Dr Karim Ayari',
-      role: 'Médecine Générale',
-      message: 'Parfait, je prescris la radio. Dois-je commencer une antibiothérapie empirique ?',
-      time: '14:27',
-      isOwn: true
-    },
-    {
-      author: 'Dr Salma Mansouri',
-      role: 'Pneumologie',
-      message: 'Oui, Azithromycine 500mg/j pendant 3 jours serait approprié en attendant les résultats.',
-      time: '14:30',
-      isOwn: false
+interface Message {
+  id: string;
+  author: string;
+  role: string;
+  message: string;
+  time: string;
+  isOwn: boolean;
+}
+
+export function DoctorCollaboration({ onNavigate }: Props) {
+  const { currentProfile, isDoctor } = useAuth();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedDiscussionId, setSelectedDiscussionId] = useState<string | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    if (!isDoctor || !currentProfile?.doctorProfileId) {
+      setLoading(false);
+      return;
     }
-  ];
+
+    loadDoctorProfile();
+    loadDiscussions();
+  }, [currentProfile, isDoctor]);
+
+  useEffect(() => {
+    if (selectedDiscussionId) {
+      loadMessages(selectedDiscussionId);
+    }
+  }, [selectedDiscussionId]);
+
+  const loadDoctorProfile = async () => {
+    if (!currentProfile?.doctorProfileId) return;
+
+    const { data: doctor, error } = await supabase
+      .from('doctor_profiles')
+      .select(`
+        *,
+        profiles (
+          id,
+          full_name
+        )
+      `)
+      .eq('id', currentProfile.doctorProfileId)
+      .single();
+
+    if (!error && doctor) {
+      setDoctorProfile(doctor);
+      setProfile(doctor.profiles as Profile);
+    }
+  };
+
+  const loadDiscussions = async () => {
+    if (!currentProfile?.doctorProfileId) return;
+
+    try {
+      // Load discussions where current doctor is a participant
+      const { data: participants, error: participantsError } = await supabase
+        .from('discussion_participants')
+        .select(`
+          discussion_id,
+          discussions (
+            id,
+            patient_profile_id,
+            title,
+            created_at,
+            patient_profiles (
+              profiles (
+                full_name
+              )
+            )
+          )
+        `)
+        .eq('doctor_profile_id', currentProfile.doctorProfileId);
+
+      if (participantsError) throw participantsError;
+
+      if (participants) {
+        const formattedConversations: Conversation[] = [];
+
+        for (const participant of participants) {
+          const discussion = participant.discussions as any;
+          if (!discussion) continue;
+
+          // Get all participants for this discussion
+          const { data: allParticipants } = await supabase
+            .from('discussion_participants')
+            .select(`
+              doctor_profiles (
+                profiles (
+                  full_name
+                )
+              )
+            `)
+            .eq('discussion_id', discussion.id);
+
+          const participantNames = (allParticipants || [])
+            .map((p: any) => p.doctor_profiles?.profiles?.full_name)
+            .filter(Boolean);
+
+          // Get last message
+          const { data: lastMessage } = await supabase
+            .from('discussion_messages')
+            .select('*')
+            .eq('discussion_id', discussion.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          const patientName = discussion.patient_profiles?.profiles?.full_name || 'Patient inconnu';
+          const now = new Date();
+          const messageTime = lastMessage ? new Date(lastMessage.created_at) : new Date(discussion.created_at);
+          const minutesAgo = Math.floor((now.getTime() - messageTime.getTime()) / (1000 * 60));
+          const timeStr = minutesAgo < 60 ? `Il y a ${minutesAgo} min` :
+                          minutesAgo < 1440 ? `Il y a ${Math.floor(minutesAgo / 60)}h` :
+                          `Il y a ${Math.floor(minutesAgo / 1440)}j`;
+
+          formattedConversations.push({
+            id: discussion.id,
+            patient: patientName,
+            participants: participantNames,
+            lastMessage: lastMessage?.message_text || 'Aucun message',
+            time: timeStr,
+            unread: 0, // TODO: Calculate unread count
+            discussionId: discussion.id
+          });
+        }
+
+        setConversations(formattedConversations);
+      }
+    } catch (error) {
+      console.error('Error loading discussions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMessages = async (discussionId: string) => {
+    try {
+      const { data: messagesData, error } = await supabase
+        .from('discussion_messages')
+        .select(`
+          *,
+          sender_profile:profiles!discussion_messages_sender_profile_id_fkey (
+            id,
+            full_name
+          ),
+          doctor_profiles (
+            specialty
+          )
+        `)
+        .eq('discussion_id', discussionId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (messagesData) {
+        const formattedMessages: Message[] = messagesData.map((msg: any) => {
+          const senderName = msg.sender_profile?.full_name || 'Médecin';
+          const senderRole = msg.doctor_profiles?.specialty || 'Médecin';
+          const isOwn = msg.sender_profile_id === profile?.id;
+
+          return {
+            id: msg.id,
+            author: senderName,
+            role: senderRole,
+            message: msg.message_text,
+            time: new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+            isOwn
+          };
+        });
+
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !selectedDiscussionId || !currentProfile?.doctorProfileId || !profile || sending) return;
+
+    setSending(true);
+    try {
+      const { error } = await supabase
+        .from('discussion_messages')
+        .insert({
+          discussion_id: selectedDiscussionId,
+          sender_profile_id: profile.id,
+          message_text: messageText,
+        });
+
+      if (error) throw error;
+
+      setMessageText('');
+      // Reload messages
+      await loadMessages(selectedDiscussionId);
+      // Reload discussions to update last message
+      await loadDiscussions();
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Erreur lors de l\'envoi du message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleCreateDiscussion = async () => {
+    // TODO: Implement discussion creation UI
+    // For now, this would require selecting a patient first
+    alert('Fonctionnalité de création de discussion à implémenter');
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return '??';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    onNavigate('landing');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -79,15 +272,15 @@ export function DoctorCollaboration({ onNavigate }: Props) {
               <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarFallback className="bg-indigo-100 text-indigo-600">
-                    KA
+                    {getInitials(profile?.full_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-gray-900">Dr Karim Ayari</p>
-                  <p className="text-xs text-gray-500">Médecine Générale</p>
+                  <p className="text-gray-900">{profile?.full_name || 'Médecin'}</p>
+                  <p className="text-xs text-gray-500">{doctorProfile?.specialty || ''}</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Déconnexion
               </Button>
@@ -132,13 +325,25 @@ export function DoctorCollaboration({ onNavigate }: Props) {
             </div>
 
             <div className="space-y-3">
-              {conversations.map((conv, index) => (
-                <Card 
-                  key={index} 
-                  className={`p-4 cursor-pointer transition-all ${
-                    index === 0 ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
-                  }`}
-                >
+              {loading ? (
+                <div className="text-center py-8 text-gray-500">Chargement des discussions...</div>
+              ) : conversations.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Aucune discussion disponible</p>
+                  <Button className="mt-4" onClick={handleCreateDiscussion}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Créer une discussion
+                  </Button>
+                </div>
+              ) : (
+                conversations.map((conv) => (
+                  <Card 
+                    key={conv.id} 
+                    className={`p-4 cursor-pointer transition-all ${
+                      selectedDiscussionId === conv.discussionId ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                    }`}
+                    onClick={() => setSelectedDiscussionId(conv.discussionId)}
+                  >
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h3 className="text-gray-900 mb-1">{conv.patient}</h3>
@@ -160,7 +365,7 @@ export function DoctorCollaboration({ onNavigate }: Props) {
                   </p>
                   <span className="text-xs text-gray-500">{conv.time}</span>
                 </Card>
-              ))}
+              )))}
             </div>
 
             <Card className="p-6 mt-6 bg-blue-50 border-blue-200">
@@ -214,9 +419,11 @@ export function DoctorCollaboration({ onNavigate }: Props) {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {messages.map((msg, index) => (
+                {selectedDiscussionId ? (
+                  messages.length > 0 ? (
+                    messages.map((msg) => (
                   <div 
-                    key={index} 
+                    key={msg.id} 
                     className={`flex gap-3 ${msg.isOwn ? 'flex-row-reverse' : ''}`}
                   >
                     <Avatar className="w-10 h-10">
@@ -251,22 +458,42 @@ export function DoctorCollaboration({ onNavigate }: Props) {
                       </div>
                     </div>
                   </div>
-                ))}
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      Aucun message dans cette discussion
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    Sélectionnez une discussion pour voir les messages
+                  </div>
+                )}
               </div>
 
               {/* Input */}
-              <div className="p-6 border-t border-gray-200">
-                <div className="flex gap-3">
-                  <Textarea 
-                    placeholder="Tapez votre message... Utilisez @ pour mentionner un médecin"
-                    className="resize-none"
-                    rows={2}
-                  />
-                  <Button className="bg-blue-600 hover:bg-blue-700 self-end">
-                    <Send className="w-4 h-4" />
-                  </Button>
+              {selectedDiscussionId && (
+                <div className="p-6 border-t border-gray-200">
+                  <div className="flex gap-3">
+                    <Textarea 
+                      placeholder="Tapez votre message... Utilisez @ pour mentionner un médecin"
+                      className="resize-none"
+                      rows={2}
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && !sending && handleSendMessage()}
+                      disabled={sending}
+                    />
+                    <Button 
+                      className="bg-blue-600 hover:bg-blue-700 self-end"
+                      onClick={handleSendMessage}
+                      disabled={sending || !messageText.trim()}
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </Card>
           </div>
         </div>

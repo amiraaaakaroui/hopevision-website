@@ -1,0 +1,345 @@
+{
+  "common": {
+    "language": "Language",
+    "french": "French",
+    "english": "English"
+  },
+  "calendly": {
+    "title": "Book a Demo",
+    "close": "Close",
+    "loading": "Loading calendar..."
+  },
+  "waitlist": {
+    "close": "Close modal",
+    "title": "Private Beta Access",
+    "subtitle": "Join <span class=\"font-semibold text-slate-700\">1,240+ pioneer</span> testers.",
+    "roleLabel": "I am...",
+    "roles": {
+      "patient": "Patient",
+      "doctor": "Clinician",
+      "hospital": "Hospital"
+    },
+    "fullName": "Full name",
+    "fullNamePlaceholder": "John Doe",
+    "specialty": "Specialty",
+    "specialtyPlaceholder": "E.g: Cardiology, General Practice...",
+    "institutionName": "Institution name",
+    "institutionPlaceholder": "E.g: Park Clinic",
+    "email": "Email",
+    "emailPlaceholder": "name@example.com",
+    "emailError": "Please enter a valid email address.",
+    "phone": "Phone",
+    "phonePlaceholder": "+1 234 567 8900",
+    "optional": "Optional",
+    "submit": "Join waitlist",
+    "errors": {
+      "duplicateEmail": "This email is already on the waitlist.",
+      "networkError": "Connection error. Please check your internet connection and try again.",
+      "generic": "An error occurred. Please try again later."
+    },
+    "success": {
+      "patient": {
+        "title": "Welcome {{name}}!",
+        "message": "You are now on the Beta waitlist. We will contact you soon at {{email}}."
+      },
+      "professional": {
+        "title": "Request received",
+        "message": "Thank you {{name}}. The Pro module is in testing. Would you like a preview?",
+        "demoButton": "Schedule a demo (15 min)",
+        "skip": "No thanks"
+      },
+      "back": "Return to homepage"
+    }
+  },
+  "landing": {
+    "nav": {
+      "solution": "Solution",
+      "demo": "Demo",
+      "architecture": "Architecture",
+      "testimonials": "Testimonials",
+      "faq": "FAQ"
+    },
+    "header": {
+      "logoAlt": "HopeVisionAI Logo"
+    },
+    "hero": {
+      "newVersion": "New version 2.0 available",
+      "betaBadge": "BETA",
+      "title": "Medical intelligence",
+      "titleHighlight": "augmented and explainable",
+      "subtitle": "HopeVisionAI combines voice, imaging, and clinical data to provide clinicians with transparent diagnostic assistance and patients with immediate guidance.",
+      "cta": {
+        "primary": "Try Beta for Free",
+        "secondary": "Book a Demo",
+        "expectations": "Immediate access for patients. Doctors & Hospitals: request your private beta access"
+      },
+      "institutionLink": "Representing an institution?",
+      "emailConfirmed": {
+        "title": "Your email address has been successfully confirmed!",
+        "doctor": "You can now sign in to complete your physician profile and access your professional workspace.",
+        "patient": "You can now sign in to complete your patient profile and access your account.",
+        "button": "Sign in →"
+      }
+    },
+    "trust": {
+      "title": "DESIGNED FOR CLINICAL TRUST",
+      "items": {
+        "security": "Data Security",
+        "rgpd": "Confidentiality & GDPR",
+        "hl7": "HL7 / FHIR Standards",
+        "explainable": "Explainable AI",
+        "audit": "Traceability & Audit"
+      }
+    },
+    "stats": {
+      "diagnostics": "Assisted diagnostics",
+      "timeSaved": "Medical time saved",
+      "accuracy": "AI accuracy (validated)",
+      "partners": "Hospital partners",
+      "doctors": "clinicians consulted"
+    },
+    "solution": {
+      "problem": "The Challenge",
+      "title": "Modern medicine facing the data wall",
+      "description": "Between the explosion of imaging results, textual reports, and administrative overload, clinicians spend <strong>50% of their time</strong> away from patients.",
+      "points": {
+        "multimodal": "Centralization of all data (Multimodal)",
+        "transparent": "Transparent decision support (White Box)",
+        "time": "Immediate administrative time savings"
+      },
+      "multimodal": {
+        "processing": "Processing...",
+        "voice": "Voice",
+        "voiceSub": "Semantic Analysis",
+        "imaging": "Imaging",
+        "imagingSub": "Computer Vision",
+        "text": "Text",
+        "textSub": "Medical NLP",
+        "signals": "Signals",
+        "signalsSub": "IoT & Vital Signs"
+      }
+    },
+    "scenarios": {
+      "title": "One platform, two unified visions",
+      "subtitle": "Choose your profile to discover the tailored experience.",
+      "doctor": "Clinician Space",
+      "patient": "Patient Space",
+      "workflow": {
+        "tag": "Clinical Workflow",
+        "title": "From diagnosis to decision, friction-free.",
+        "description": "Follow a real clinician's journey on HopeVisionAI: import data, let AI pre-analyze, collaborate with peers, and generate reports in one click.",
+        "steps": {
+          "centralization": {
+            "title": "Centralization",
+            "text": "Images, lab results, and notes unified."
+          },
+          "analysis": {
+            "title": "AI Analysis",
+            "text": "Multimodal fusion and hypotheses."
+          },
+          "collaboration": {
+            "title": "Collaboration",
+            "text": "Instant specialist consultation."
+          },
+          "report": {
+            "title": "Report",
+            "text": "Automatic and secure generation."
+          }
+        },
+        "restart": "Restart demo"
+      },
+      "patientDemo": {
+        "tag": "Interactive Demo",
+        "title": "Try the patient journey",
+        "description": "Click on the phone interface to experience HopeVisionAI: from multimodal analysis to booking, guided by AI.",
+        "features": {
+          "multimodal": {
+            "title": "1. Multimodality",
+            "text": "Patients express themselves freely (voice, image, text)."
+          },
+          "reasoning": {
+            "title": "2. AI Reasoning",
+            "text": "Dynamic precision questions to refine pre-diagnosis."
+          },
+          "orientation": {
+            "title": "3. Orientation",
+            "text": "Direct booking with the most relevant specialist."
+          }
+        },
+        "restart": "Restart demo"
+      },
+      "doctorDemo": {
+        "title": "HopeVisionAI | Clinician",
+        "dashboard": "Dashboard",
+        "pending": "Pending",
+        "urgent": "Urgent",
+        "avgTime": "Avg Time",
+        "queue": "Queue",
+        "backToList": "Back to list",
+        "patient": {
+          "name": "John Doe",
+          "info": "Male, 54 years • Reason: Persistent dyspnea"
+        },
+        "import": {
+          "title": "Import data",
+          "subtitle": "Drag & drop MRI, PDF, Audio...",
+          "security": "Securing & Importing...",
+          "encryption": "AES-256 encryption in progress"
+        },
+        "analysis": {
+          "vision": "Vision (MRI)",
+          "nlp": "NLP (Text)",
+          "analyzing": "Analyzing...",
+          "extracting": "Extracting...",
+          "results": "Analysis results",
+          "diagnosis": "Atypical Pneumonia",
+          "confidence": "94% AI"
+        }
+      }
+    },
+    "tech": {
+      "tag": "Infrastructure",
+      "title": "Architecture",
+      "titleHighlight": "cutting-edge",
+      "subtitle": "Designed for performance, security, and strict medical ethics.",
+      "cards": {
+        "knowledgeGraph": {
+          "title": "Clinical Knowledge Graph",
+          "text": "Semantic network linking symptoms and diseases for human-like clinical reasoning."
+        },
+        "security": {
+          "title": "Security & HDS",
+          "text": "End-to-end encryption. Data hosted on HDS-certified servers in France, full GDPR compliance."
+        },
+        "interoperability": {
+          "title": "Interoperability (FHIR)",
+          "text": "Seamless integration with existing hospital systems (HL7), laboratories, and EHRs."
+        },
+        "explainable": {
+          "title": "Explainable AI",
+          "text": "No black box. Every decision is justified by transparent clinical evidence."
+        },
+        "learning": {
+          "title": "Learning Loop",
+          "text": "The model continuously improves through expert clinician validation and feedback."
+        },
+        "digitalTwin": {
+          "title": "Digital Twin",
+          "text": "Health state evolution simulation for predictive and personalized medicine."
+        }
+      }
+    },
+    "testimonials": {
+      "title": "They use HopeVisionAI daily",
+      "subtitle": "Feedback from our medical community and patient base.",
+      "items": [
+        {
+          "quote": "The automatic triage of cases by urgency and the combined analysis of text, voice, and images represent exactly the type of solution we need to save time and improve accuracy. Excellent work.",
+          "name": "Dr. Emira S.",
+          "title": "Family Physician"
+        },
+        {
+          "quote": "Thanks to HopeVisionAI, I was able to quickly understand the severity of my symptoms and go to the emergency room in time. I was treated and hospitalized. For six months, I used HopeVisionAI to track the evolution of my health status, analyze my symptoms, and better organize my medical documents. This system was invaluable and I'm convinced it helped preserve my health.",
+          "name": "Amira K.",
+          "title": "Patient"
+        },
+        {
+          "quote": "HopeVisionAI provides a concrete response to the cognitive overload of our teams. The platform's ability to simultaneously analyze text, voice, and images would allow us to quickly structure patient files and better organize emergency workflows.",
+          "name": "Emergency Physician",
+          "title": "Mongi Slim Hospital"
+        }
+      ]
+    },
+    "cta": {
+      "title": "Join the medical revolution",
+      "subtitle": "Discover how HopeVisionAI can reduce your administrative tasks by 30% from the first month.",
+      "emailPlaceholder": "Your professional email...",
+      "button": "Get started",
+      "noCard": "No card required",
+      "hdsInstall": "HDS installation"
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "subtitle": "Everything you need to know about integrating HopeVisionAI.",
+      "items": [
+        {
+          "question": "How is health data protected?",
+          "answer": "Security is our absolute priority. All data is encrypted end-to-end and hosted on HDS-certified (Health Data Host) servers in France, in strict compliance with GDPR."
+        },
+        {
+          "question": "Does HopeVisionAI integrate with my current medical software?",
+          "answer": "Yes. Thanks to our FHIR and HL7-compatible API, HopeVisionAI interfaces with the majority of EHRs (Electronic Health Records) and practice management software on the market without disrupting your workflow."
+        },
+        {
+          "question": "Does AI replace physician diagnosis?",
+          "answer": "Absolutely not. HopeVisionAI is a Clinical Decision Support System (CDSS). It provides analyses and prioritizes risks, but clinical validation and final decision always belong to the practitioner."
+        },
+        {
+          "question": "What is the accuracy of image analysis models?",
+          "answer": "Our models achieve 98.5% sensitivity on standard pathologies (validated by clinical study). The system continuously learns through expert clinician feedback loops."
+        }
+      ]
+    },
+    "footer": {
+      "tagline": "Ethical and explainable medical AI.",
+      "product": "Product",
+      "productLinks": {
+        "doctors": "For Clinicians",
+        "patients": "For Patients"
+      },
+      "company": "Company",
+      "companyLinks": {
+        "about": "About",
+        "contact": "Contact"
+      },
+      "legal": "Legal",
+      "legalLinks": {
+        "privacy": "Privacy",
+        "hds": "HDS"
+      },
+      "copyright": "© 2024 HopeVisionAI.",
+      "operational": "Operational"
+    },
+    "b2b": {
+      "tag": "Enterprise Solutions & Ecosystem",
+      "title": "Transform your data into a lever for",
+      "titleHighlight": "performance and prevention",
+      "subtitle": "Custom solutions designed to reduce risks, optimize costs, and accelerate medical research.",
+      "hospitals": {
+        "title": "Hospitals & Clinics",
+        "subtitle": "Operational Performance",
+        "points": {
+          "time": "<strong class=\"text-slate-900\">Reduce by 30%</strong> physician administrative time.",
+          "security": "<strong class=\"text-slate-900\">Secure diagnostics</strong> and reduce error risks.",
+          "flow": "Streamline <strong class=\"text-slate-900\">patient flow</strong> in emergency departments with AI triage."
+        },
+        "cta": "Request a clinical audit"
+      },
+      "insurers": {
+        "title": "Insurers & Health Plans",
+        "subtitle": "Risk Management",
+        "points": {
+          "care": "Right care: Direct members to the appropriate specialist.",
+          "prevention": "Proactive prevention services to reduce claims.",
+          "data": "Real-time population health data."
+        },
+        "cta": "Simulate your savings"
+      },
+      "labs": {
+        "title": "Labs & Pharma",
+        "subtitle": "R&D & Innovation Data",
+        "points": {
+          "data": "Access <strong class=\"text-slate-900\">structured data</strong> and anonymized.",
+          "cohorts": "Identify <strong class=\"text-slate-900\">qualified cohorts</strong> for clinical trials.",
+          "rwe": "Demonstrate treatment effectiveness in <strong class=\"text-slate-900\">real-world evidence (RWE)</strong>."
+        },
+        "cta": "Access Data Hub"
+      },
+      "cta": {
+        "title": "Need a specific integration?",
+        "description": "Our teams deploy HopeVisionAI on-site or in sovereign HDS cloud. Standardized API integration and native GDPR compliance.",
+        "button": "Talk to a Solutions Expert"
+      }
+    }
+  }
+}

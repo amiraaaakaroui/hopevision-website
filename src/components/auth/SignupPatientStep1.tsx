@@ -3,12 +3,16 @@ import { Brain, Heart, User, Mail, Lock, Eye, EyeOff, Globe } from 'lucide-react
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Screen } from '../../App';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
 export function SignupPatientStep1({ onNavigate }: Props) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [emailConfirmationRequired, setEmailConfirmationRequired] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -34,10 +38,163 @@ export function SignupPatientStep1({ onNavigate }: Props) {
 
   const countries = ['Tunisie', 'France', 'Maroc', 'Algérie', 'Canada', 'Belgique', 'Suisse'];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleGoogleSignup = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/?role=patient`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        console.error('Erreur Google signup patient:', error.message);
+        setError('Erreur lors de la connexion avec Google. Veuillez réessayer.');
+        setLoading(false);
+      }
+      // If successful, browser will redirect to Google
+    } catch (err: any) {
+      console.error('Erreur Google signup:', err);
+      setError('Erreur lors de la connexion avec Google.');
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.password === formData.confirmPassword && formData.acceptTerms) {
+    if (formData.password !== formData.confirmPassword || !formData.acceptTerms) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Create auth user
+      // NOTE: signUp() may or may not return a session depending on email confirmation settings
+      // We store role in metadata so the database trigger can create the profile after email confirmation
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: `${formData.firstName} ${formData.lastName}`,
+            country: formData.country,
+            role: 'patient', // Store role in metadata for trigger
+            referral_source: formData.referralSource || null, // ✅ Add referral source
+            signup_step1_data: JSON.stringify(formData), // Store form data for Step 2 after confirmation
+          }
+        }
+      });
+
+      if (signUpError) throw signUpError;
+      if (!authData.user) throw new Error('Erreur lors de la création du compte');
+
+      const userId = authData.user.id;
+
+      // 2. Ensure session is established for RLS
+      // RLS policy requires: user_id = auth.uid(), so auth.uid() must be available
+      // If signUp didn't return a session (email confirmation required), we need to get it
+      let session = authData.session;
+
+      if (!session) {
+        // Try to get the session explicitly
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          // If email confirmation is required, session won't be available yet
+          // In that case, we should NOT create the profile here - it should be done via trigger or after email confirmation
+          throw new Error('Veuillez vérifier votre email pour confirmer votre compte avant de continuer.');
+        }
+        session = sessionData?.session;
+      }
+
+      if (!session) {
+        // No session available - this happens when email confirmation is required
+        // The database trigger will create the profile automatically after email confirmation
+        // Store form data in sessionStorage so Step 2 can be completed after confirmation
+        sessionStorage.setItem('signup-patient-step1', JSON.stringify(formData));
+        sessionStorage.setItem('signup-patient-pending-confirmation', 'true');
+        sessionStorage.setItem('signup-patient-email', formData.email);
+
+        // Show success message - user needs to check email
+        setEmailConfirmationRequired(true);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
+      // Verify the session user matches
+      if (session.user.id !== userId) {
+        throw new Error('Erreur de session: l\'utilisateur ne correspond pas.');
+      }
+
+      // 3. Create profile (ONCE - this is the only place profiles row is created)
+      // RLS policy requires: WITH CHECK (user_id = auth.uid())
+      // At this point, session is established, so auth.uid() should equal userId
+      const { data: newProfile, error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: userId, // Must match auth.uid() for RLS
+          role: 'patient' as const,
+          full_name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          country: formData.country,
+          referral_source: formData.referralSource || null, // ✅ Add referral source
+          is_deleted: false
+        })
+        .select('id')
+        .single();
+
+      if (profileError) {
+        // If profile already exists (edge case), get it
+        if (profileError.code === '23505') { // Unique violation
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single();
+
+          if (existingProfile) {
+            // Profile exists, continue with it
+            sessionStorage.setItem('signup-patient-step1', JSON.stringify(formData));
+            sessionStorage.setItem('signup-patient-profile-id', existingProfile.id);
+            onNavigate('signup-patient-step2');
+            return;
+          }
+        }
+        throw profileError;
+      }
+
+      if (!newProfile) throw new Error('Erreur lors de la création du profil');
+
+      // 4. Create empty patient_profile (will be filled in Step 2)
+      const { error: patientProfileError } = await supabase
+        .from('patient_profiles')
+        .insert({
+          profile_id: newProfile.id,
+        });
+
+      if (patientProfileError) {
+        // If patient_profile already exists, that's okay - we'll update it in Step 2
+        // Silently continue
+      }
+
+      // Store step1 data and profile ID for step2
+      sessionStorage.setItem('signup-patient-step1', JSON.stringify(formData));
+      sessionStorage.setItem('signup-patient-profile-id', newProfile.id);
+
       onNavigate('signup-patient-step2');
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la création du compte. Veuillez réessayer.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,7 +209,7 @@ export function SignupPatientStep1({ onNavigate }: Props) {
             </div>
             <span className="text-xl text-gray-900">HopeVisionAI</span>
           </div>
-          <button 
+          <button
             onClick={() => onNavigate('role-selection')}
             className="text-gray-600 hover:text-gray-900 text-sm"
           >
@@ -84,12 +241,30 @@ export function SignupPatientStep1({ onNavigate }: Props) {
           </div>
 
           {/* Title */}
-          <h2 className="text-gray-900 text-center mb-2">
-            Créer mon compte Patient
-          </h2>
-          <p className="text-gray-600 text-center mb-8">
-            Rejoignez HopeVisionAI pour un suivi santé personnalisé
-          </p>
+          <h2 className="text-gray-900 text-center mb-2">Créer mon compte Patient</h2>
+          <p className="text-gray-600 text-center mb-8">Rejoignez HopeVisionAI pour un suivi santé personnalisé</p>
+
+          {/* Google Sign-up Button */}
+          <button
+            type="button"
+            onClick={handleGoogleSignup}
+            disabled={loading}
+            className="w-full mb-4 flex items-center justify-center gap-3 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <img
+              src="https://developers.google.com/identity/images/g-logo.png"
+              alt="Google"
+              className="w-5 h-5"
+            />
+            <span>Continuer avec Google</span>
+          </button>
+
+          {/* Separator */}
+          <div className="flex items-center my-6">
+            <div className="flex-grow h-px bg-gray-200" />
+            <span className="px-4 text-xs text-gray-500 uppercase font-medium">ou</span>
+            <div className="flex-grow h-px bg-gray-200" />
+          </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -102,7 +277,7 @@ export function SignupPatientStep1({ onNavigate }: Props) {
                   <input
                     type="text"
                     value={formData.firstName}
-                    onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Nadia"
                     required
@@ -116,7 +291,7 @@ export function SignupPatientStep1({ onNavigate }: Props) {
                   <input
                     type="text"
                     value={formData.lastName}
-                    onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                     className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Ben Salem"
                     required
@@ -133,7 +308,7 @@ export function SignupPatientStep1({ onNavigate }: Props) {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="nadia.bensalem@mail.com"
                   required
@@ -150,7 +325,7 @@ export function SignupPatientStep1({ onNavigate }: Props) {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="••••••••"
                     minLength={8}
@@ -172,7 +347,7 @@ export function SignupPatientStep1({ onNavigate }: Props) {
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={formData.confirmPassword}
-                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                     className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="••••••••"
                     required
@@ -195,7 +370,7 @@ export function SignupPatientStep1({ onNavigate }: Props) {
                 <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <select
                   value={formData.country}
-                  onChange={(e) => setFormData({...formData, country: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                   className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
                 >
                   {countries.map(country => (
@@ -212,7 +387,7 @@ export function SignupPatientStep1({ onNavigate }: Props) {
               </label>
               <select
                 value={formData.referralSource}
-                onChange={(e) => setFormData({...formData, referralSource: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, referralSource: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
                 required
               >
@@ -229,7 +404,7 @@ export function SignupPatientStep1({ onNavigate }: Props) {
                 <input
                   type="checkbox"
                   checked={formData.acceptTerms}
-                  onChange={(e) => setFormData({...formData, acceptTerms: e.target.checked})}
+                  onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
                   className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1"
                   required
                 />
@@ -242,13 +417,41 @@ export function SignupPatientStep1({ onNavigate }: Props) {
               </label>
             </div>
 
+            {/* Email Confirmation Required Message */}
+            {emailConfirmationRequired && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                      Vérification de l'email requise
+                    </h3>
+                    <p className="text-sm text-blue-800 mb-2">
+                      Nous avons envoyé un email de confirmation à <strong>{formData.email}</strong>.
+                      Veuillez cliquer sur le lien dans l'email pour confirmer votre compte.
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      Une fois votre email confirmé, vous pourrez continuer avec l'étape 2.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+
             {/* Submit */}
-            <Button 
+            <Button
               type="submit"
               className="w-full bg-blue-600 hover:bg-blue-700 py-3"
-              disabled={!formData.acceptTerms || formData.password !== formData.confirmPassword}
+              disabled={!formData.acceptTerms || formData.password !== formData.confirmPassword || loading || emailConfirmationRequired}
             >
-              Continuer → Étape 2
+              {loading ? 'Création du compte...' : emailConfirmationRequired ? 'Vérifiez votre email' : 'Continuer → Étape 2'}
             </Button>
           </form>
 

@@ -3,6 +3,7 @@ import { Brain, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Screen } from '../../App';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
@@ -11,10 +12,28 @@ interface Props {
 export function ForgotPassword({ onNavigate }: Props) {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setError(null);
+    setLoading(true);
+
+    try {
+      const redirectUrl = `${window.location.origin}/auth-reset-password`;
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (resetError) throw resetError;
+
+      setSubmitted(true);
+    } catch (err: any) {
+      console.error('Forgot password error:', err);
+      setError(err.message || 'Erreur lors de l\'envoi de l\'e-mail. Veuillez réessayer.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,6 +73,13 @@ export function ForgotPassword({ onNavigate }: Props) {
               Entrez votre e-mail pour recevoir un lien de réinitialisation
             </p>
 
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
@@ -76,8 +102,9 @@ export function ForgotPassword({ onNavigate }: Props) {
               <Button 
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700 py-3"
+                disabled={loading}
               >
-                Envoyer un lien de réinitialisation
+                {loading ? 'Envoi...' : 'Envoyer un lien de réinitialisation'}
               </Button>
             </form>
 

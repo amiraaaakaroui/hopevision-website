@@ -3,19 +3,174 @@ import { Brain, Stethoscope, Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Screen } from '../../App';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
 export function LoginDoctor({ onNavigate }: Props) {
-  const [email, setEmail] = useState('dr.karim.ayari@hopital.tn');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = () => {
-    onNavigate('doctor-dashboard');
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/?role=doctor`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        console.error('Erreur Google login médecin:', error.message);
+        setError('Erreur lors de la connexion avec Google. Veuillez réessayer.');
+        setLoading(false);
+      }
+      // If successful, browser will redirect to Google
+    } catch (err: any) {
+      console.error('Erreur Google login:', err);
+      setError('Erreur lors de la connexion avec Google.');
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        console.error('[LoginDoctor] Sign in error:', signInError);
+
+        // Check for specific error codes
+        if (signInError.message?.includes('email_not_confirmed') ||
+          signInError.message?.includes('Email not confirmed') ||
+          signInError.message?.includes('Email not verified')) {
+          throw new Error('Veuillez confirmer votre adresse email avant de vous connecter.');
+        }
+
+        if (signInError.message?.includes('Invalid login credentials')) {
+          throw new Error('Email ou mot de passe incorrect.');
+        }
+
+        if (signInError.message?.includes('Failed to fetch')) {
+          throw new Error('Erreur de connexion au serveur. Vérifiez votre connexion internet.');
+        }
+
+        throw signInError;
+      }
+
+      if (data.user) {
+        // Check if user has a profile
+        let { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, role')
+          .eq('user_id', data.user.id)
+          .eq('is_deleted', false)
+          .maybeSingle();
+
+        // If profile doesn't exist, try to create it (fallback if trigger didn't run)
+        if (!profile && !profileError) {
+          // Get user metadata to determine role
+          const userMetadata = data.user.user_metadata || {};
+          const role = userMetadata.role || 'doctor'; // Default to doctor for doctor login
+
+          // Create profile (RLS allows this because user_id = auth.uid())
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: data.user.id,
+              role: role,
+              full_name: userMetadata.full_name || data.user.email || 'Utilisateur',
+              email: data.user.email || '',
+              country: userMetadata.country || null,
+            })
+            .select('id, role')
+            .single();
+
+          if (!createError && newProfile) {
+            profile = newProfile;
+
+            // Create doctor_profile if role is doctor
+            if (role === 'doctor') {
+              // Extract specialty from metadata, use default if missing
+              const specialty = userMetadata.specialty || 'Médecine générale';
+              await supabase
+                .from('doctor_profiles')
+                .insert({
+                  profile_id: newProfile.id,
+                  specialty: specialty,
+                  is_verified: false
+                })
+                .select('id')
+                .maybeSingle();
+            }
+          }
+        }
+
+        if (profile?.role === 'doctor') {
+          // Check doctor profile completeness using DB only (not sessionStorage)
+          const { data: doctorProfile } = await supabase
+            .from('doctor_profiles')
+            .select('specialty, rpps_number, city')
+            .eq('profile_id', profile.id)
+            .maybeSingle();
+
+          const { data: fullProfile } = await supabase
+            .from('profiles')
+            .select('country')
+            .eq('id', profile.id)
+            .single();
+
+          // Clean up any stale sessionStorage
+          sessionStorage.removeItem('signup-doctor-step1');
+          sessionStorage.removeItem('signup-doctor-step2');
+          sessionStorage.removeItem('signup-doctor-profile-id');
+
+          // Determine profile completeness (now includes city)
+          const hasSpecialty = !!doctorProfile?.specialty;
+          const hasRPPS = !!doctorProfile?.rpps_number;
+          const hasCountry = !!fullProfile?.country;
+          const hasCity = !!doctorProfile?.city;
+
+          // Route based on what's missing
+          if (!hasSpecialty || !hasRPPS || !hasCountry || !hasCity) {
+            // Missing professional data = needs Step 2
+            onNavigate('signup-doctor-step2');
+          } else {
+            // Complete profile = go to dashboard
+            onNavigate('doctor-dashboard');
+          }
+        } else if (profile?.role) {
+          setError(`Ce compte n'est pas un compte médecin. Veuillez utiliser la connexion ${profile.role === 'patient' ? 'patient' : 'admin'}.`);
+        } else {
+          setError('Profil non trouvé. Veuillez contacter le support.');
+        }
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.message || 'Erreur lors de la connexion. Vérifiez vos identifiants.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -29,7 +184,7 @@ export function LoginDoctor({ onNavigate }: Props) {
             </div>
             <span className="text-xl text-gray-900">HopeVisionAI</span>
           </div>
-          <button 
+          <button
             onClick={() => onNavigate('role-selection')}
             className="text-gray-600 hover:text-gray-900 text-sm"
           >
@@ -53,8 +208,37 @@ export function LoginDoctor({ onNavigate }: Props) {
           Accédez à votre espace professionnel
         </p>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
+        {/* Google Login Button */}
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="w-full mb-4 flex items-center justify-center gap-3 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <img
+            src="https://developers.google.com/identity/images/g-logo.png"
+            alt="Google"
+            className="w-5 h-5"
+          />
+          <span>Se connecter avec Google</span>
+        </button>
+
+        {/* Separator */}
+        <div className="flex items-center my-6">
+          <div className="flex-grow h-px bg-gray-200" />
+          <span className="px-4 text-xs text-gray-500 uppercase font-medium">ou</span>
+          <div className="flex-grow h-px bg-gray-200" />
+        </div>
+
         {/* Form */}
-        <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} className="space-y-5">
+        <form onSubmit={handleLogin} className="space-y-5">
           {/* Email */}
           <div>
             <label className="block text-gray-700 mb-2">
@@ -119,11 +303,12 @@ export function LoginDoctor({ onNavigate }: Props) {
           </div>
 
           {/* Submit Button */}
-          <Button 
+          <Button
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700 py-3"
+            disabled={loading}
           >
-            Se connecter à mon espace Médecin
+            {loading ? 'Connexion...' : 'Se connecter à mon espace Médecin'}
           </Button>
         </form>
 

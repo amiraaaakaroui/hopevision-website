@@ -2,6 +2,7 @@ import { Heart, Brain, Shield, ArrowRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Screen } from '../App';
+import { clearAnalysisSession } from '../services/analysisWorkflowService';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
@@ -47,7 +48,11 @@ export function PatientLanding({ onNavigate }: Props) {
               <Button 
                 size="lg" 
                 className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => onNavigate('patient-consent')}
+                onClick={() => {
+                  // CRITICAL: Clear any existing session before starting new analysis
+                  clearAnalysisSession();
+                  onNavigate('patient-consent');
+                }}
               >
                 Commencer ma pré-analyse
                 <ArrowRight className="w-5 h-5 ml-2" />

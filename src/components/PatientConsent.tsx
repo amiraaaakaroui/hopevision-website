@@ -6,17 +6,50 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Screen } from '../App';
 import { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { startNewAnalysis } from '../services/analysisWorkflowService';
 
 interface Props {
   onNavigate: (screen: Screen) => void;
 }
 
 export function PatientConsent({ onNavigate }: Props) {
+  const { currentProfile, isPatient } = useAuth();
   const [rgpdConsent, setRgpdConsent] = useState(false);
   const [dataConsent, setDataConsent] = useState(false);
   const [language, setLanguage] = useState('fr');
+  const [isStarting, setIsStarting] = useState(false);
 
   const canProceed = rgpdConsent && dataConsent;
+
+  const handleContinue = async () => {
+    if (!isPatient || !currentProfile?.patientProfileId) {
+      alert('Veuillez vous connecter en tant que patient');
+      return;
+    }
+
+    if (!canProceed) {
+      return;
+    }
+
+    setIsStarting(true);
+    try {
+      // CRITICAL: Start a NEW pre-analysis workflow
+      // This clears old sessionStorage and creates a fresh pre-analysis
+      await startNewAnalysis({
+        patientProfileId: currentProfile.patientProfileId,
+        // No initial data - user will fill it in PatientSymptoms
+      });
+
+      // Navigate to symptoms screen
+      onNavigate('patient-symptoms');
+    } catch (error: any) {
+      console.error('[PatientConsent] Error starting new analysis:', error);
+      alert(`Erreur lors du démarrage: ${error.message || 'Veuillez réessayer.'}`);
+    } finally {
+      setIsStarting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -130,10 +163,10 @@ export function PatientConsent({ onNavigate }: Props) {
             </Button>
             <Button 
               className="flex-1 bg-blue-600 hover:bg-blue-700"
-              disabled={!canProceed}
-              onClick={() => onNavigate('patient-symptoms')}
+              disabled={!canProceed || isStarting}
+              onClick={handleContinue}
             >
-              Continuer
+              {isStarting ? 'Démarrage...' : 'Continuer'}
             </Button>
           </div>
         </Card>
